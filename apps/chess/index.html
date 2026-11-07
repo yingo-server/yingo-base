@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>国际象棋 · 本地对弈</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        /* 日志区域样式（半透明深色背景，亮色文字，无外边框） */
+        #engineLogArea {
+            margin-top: 8px;
+            padding: 6px 8px;
+            font-family: monospace;
+            font-size: 11px;
+            background: rgba(30,30,30,0.9);
+            color: #ccc;
+            border-radius: 4px;
+            max-height: 100px;
+            overflow-y: auto;
+            border: none;
+        }
+        #engineLogContent .engine-log-entry {
+            padding: 2px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        #engineLogArea::-webkit-scrollbar {
+            width: 6px;
+        }
+        #engineLogArea::-webkit-scrollbar-track {
+            background: #2d2d2d;
+            border-radius: 3px;
+        }
+        #engineLogArea::-webkit-scrollbar-thumb {
+            background: #555;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div id="transitionOverlay"></div>
+    <div id="splash">
+        <div class="splash-piece" id="splashPiece"></div>
+    </div>
+    <div id="lobby" style="display:none;">
+        <div class="lobby-container">
+            <h1 class="logo">♞ Chess</h1>
+            <div class="menu-buttons">
+                <button id="localBtn" class="vs-btn primary">本地双人</button>
+                <button id="aiBtn" class="vs-btn primary">AI对战</button>
+            </div>
+        </div>
+    </div>
+            <div id="roomInfo" class="room-info-box" style="display:none;">
+                <p>房间号：<strong id="roomIdDisplay"></strong> <button id="copyRoomBtn" class="vs-btn small">复制</button></p>
+                <p id="waitingText">等待对手加入...</p>
+                <button id="cancelRoomBtn" class="vs-btn secondary small" style="margin-top:8px;">取消</button>
+            </div>
+            <div id="joinPanel" class="join-panel" style="display:none;">
+                <input type="text" id="joinRoomIdInput" placeholder="输入房间号（5位）" maxlength="5" class="vs-input">
+                <button id="joinSubmitBtn" class="vs-btn primary">加入</button>
+                <p id="joinError" style="color:#e05555;display:none;margin-top:8px;"></p>
+            </div>
+        </div>
+    </div>
+    <div id="gameContainer" style="display:none;">
+        <div class="app">
+            <div class="title-bar">
+                <span class="icon"><i class="fas fa-chess-king"></i></span>
+                <span class="name" id="gameModeLabel">本地对战</span>
+                <span style="flex:1;"></span>
+                <div id="onlineButtons" style="display:none;">
+                    <button id="drawBtn" class="title-btn">求和</button>
+                    <button id="resignBtn" class="title-btn">认输</button>
+                </div>
+                <span id="roomDisplayInGame" class="room-info"></span>
+                <span class="dot" id="statusDot"></span>
+            </div>
+            <div class="canvas-wrap">
+                <canvas id="boardCanvas"></canvas>
+            </div>
+            <div class="status-bar">
+                <span class="tdot w" id="turnDot"></span>
+                <span id="turnText">白方走棋</span>
+                <span id="moveCount" style="color:#555;">第1步</span>
+                <button class="reset-btn" id="resetBtn">⟳ 重置</button>
+                <button class="reset-btn" id="toggleLogBtn" style="display: none;">日志</button>
+            </div>
+            <div id="engineLogArea" style="display: none;"></div>
+            <div class="promo-overlay" id="promoOverlay" style="display:none;">
+                <div class="promo-dlg">
+                    <span class="lbl">选择升变棋子</span>
+                    <div class="promo-opts" id="promoOpts"></div>
+                </div>
+            </div>
+        </div>
+        <div id="avatarOpponentContainer" class="avatar-container opponent-container">
+            <img id="avatarOpponent" class="avatar avatar-opponent" alt="对手头像">
+            <div class="bubble opponent-bubble" style="display:none;"></div>
+        </div>
+        <div id="avatarSelfContainer" class="avatar-container self-container">
+            <img id="avatarSelf" class="avatar avatar-self" alt="己方头像">
+            <div class="bubble self-bubble" style="display:none;"></div>
+        </div>
+    </div>
+    <div class="notif-container" id="notifContainer"></div>
+
+    <script>
+        const FA_CHESS_SPLASH = { pawn:'\uf443', rook:'\uf447', knight:'\uf441', bishop:'\uf43a', queen:'\uf445', king:'\uf43f' };
+        const pieceOrder = ['pawn','rook','knight','bishop','queen','king'];
+        const splashEl = document.getElementById('splashPiece');
+        let animIdx = 0;
+        window.splashReady = false;
+        function playSplash() {
+            if (animIdx >= pieceOrder.length) {
+                splashEl.textContent = FA_CHESS_SPLASH['king'];
+                splashEl.style.transform = 'scale(1)';
+                splashEl.style.animation = 'breathe 1.2s ease-in-out infinite';
+                window.splashReady = true;
+                if (typeof window.tryInitApp === 'function') window.tryInitApp();
+                return;
+            }
+            splashEl.textContent = FA_CHESS_SPLASH[pieceOrder[animIdx]];
+            splashEl.style.transform = 'scale(1.4)';
+            setTimeout(() => splashEl.style.transform = 'scale(0.7)', 120);
+            setTimeout(() => splashEl.style.transform = 'scale(1)', 220);
+            animIdx++;
+            setTimeout(playSplash, 500);
+        }
+        const styleEl = document.createElement('style');
+        styleEl.textContent = '@keyframes breathe { 0%,100% { transform: scale(1); } 50% { transform: scale(1.08); } }';
+        document.head.appendChild(styleEl);
+        playSplash();
+    </script>
+
+    <script src="js/tool.js"></script>
+    <script src="js/WbyW.js"></script>
+    <script src="js/ai.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
