@@ -1,0 +1,26 @@
+:root {
+    --md-primary: #f4b740;
+    --md-primary-variant: #d89c2c;
+    --md-secondary: #b76e2e;
+    --md-secondary-variant: #8e541f;
+    --md-background: #fef7e9;
+    --md-surface: #fff8ed;
+    --md-error: #ba2d2d;
+    --md-on-primary: #2c1e0e;
+    --md-on-secondary: #ffffff;
+    --md-on-background: #3b2e1c;
+    --md-on-surface: #3b2e1c;
+    --md-on-error: #ffffff;
+    --md-disabled: #e0d6c8;
+    --md-disabled-text: #8b7f6e;
+    --md-hover-overlay: rgba(180, 130, 60, 0.12);
+    --md-focus-overlay: rgba(180, 130, 60, 0.2);
+    --md-shadow-1: 0 2px 4px rgba(0,0,0,0.2);
+    --md-shadow-2: 0 4px 8px rgba(0,0,0,0.2);
+    --md-shadow-3: 0 6px 12px rgba(0,0,0,0.2);
+    --md-shadow-4: 0 8px 16px rgba(0,0,0,0.2);
+    --md-radius-small: 4px;
+    --md-radius-medium: 8px;
+    --md-radius-large: 16px;
+    --md-radius-round: 50%;
+}
