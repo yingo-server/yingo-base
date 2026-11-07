@@ -80,13 +80,6 @@ const outPath = join(ROOT, 'yingotab.yml');
 if (existsSync(outPath) && readFileSync(outPath, 'utf8') === out) {
   console.log('yingotab.yml is up to date.');
 } else {
-  process.stdout.write(out);
-  if (process.env.CI) {
-    const { writeFileSync } = await import('node:fs');
-    writeFileSync(outPath, out);
-    console.error('Wrote yingotab.yml');
-  } else {
-    writeFileSync(outPath, out);
-    console.error('Wrote yingotab.yml');
-  }
+  writeFileSync(outPath, out);
+  console.error('Wrote yingotab.yml');
 }
