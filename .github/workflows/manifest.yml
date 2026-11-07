@@ -1,0 +1,34 @@
+name: Regenerate manifest
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  regenerate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Generate yingotab.yml
+        run: node scripts/gen-yml.mjs
+
+      - name: Commit and push if changed
+        run: |
+          git config user.name "yingo-server"
+          git config user.email "noreply@344977.xyz"
+          if [[ -n "$(git status --porcelain)" ]]; then
+            git add yingotab.yml
+            git commit -m "chore: regenerate yingotab.yml [skip ci]"
+            git push
+          else
+            echo "No changes to yingotab.yml"
+          fi

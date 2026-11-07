@@ -1,0 +1,7 @@
+{
+  "id": "example-clock-widget",
+  "name": "示例组件",
+  "icon": "🕒",
+  "type": "grid",
+  "entry": "apps/example-clock-widget/index.html"
+}

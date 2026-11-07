@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>翻译</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: #f5f6f8; color: #1f2328; height: 100vh; display: flex; flex-direction: column;
+  }
+  header {
+    display: flex; align-items: center; gap: 10px; padding: 14px 20px;
+    background: #fff; border-bottom: 1px solid #e5e7eb;
+  }
+  header .logo { font-size: 22px; }
+  header h1 { font-size: 16px; font-weight: 600; }
+  header .hint { margin-left: auto; font-size: 12px; color: #8b949e; }
+  .langbar { display: flex; align-items: center; gap: 10px; padding: 10px 20px; }
+  label { font-size: 13px; color: #57606a; }
+  select {
+    padding: 6px 10px; font-size: 14px; border: 1px solid #d0d7de; border-radius: 8px;
+    background: #fff; color: #1f2328; outline: none; cursor: pointer;
+  }
+  select:focus { border-color: #3b82f6; }
+  .main { flex: 1; display: flex; gap: 14px; padding: 0 20px 20px; min-height: 0; }
+  .pane {
+    flex: 1; background: #fff; border: 1px solid #e5e7eb; border-radius: 12px;
+    display: flex; flex-direction: column; min-width: 0; overflow: hidden;
+  }
+  .pane-title {
+    padding: 10px 16px; font-size: 12px; color: #8b949e; border-bottom: 1px solid #f0f1f3;
+    display: flex; align-items: center; gap: 8px;
+  }
+  textarea {
+    flex: 1; border: none; resize: none; padding: 14px 16px; font-size: 15px; line-height: 1.6;
+    outline: none; font-family: inherit; background: transparent; color: inherit;
+  }
+  .result {
+    flex: 1; padding: 14px 16px; font-size: 15px; line-height: 1.6; overflow: auto;
+    white-space: pre-wrap; word-break: break-word;
+  }
+  .result.placeholder { color: #a5adb7; }
+  .spinner {
+    width: 18px; height: 18px; border: 2px solid #d0d7de; border-top-color: #3b82f6;
+    border-radius: 50%; animation: spin .8s linear infinite; display: none;
+  }
+  .spinner.show { display: inline-block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .error { color: #d1242f; font-size: 14px; }
+  .meta { display: flex; align-items: center; gap: 10px; padding: 8px 16px; border-top: 1px solid #f0f1f3; }
+  .btn {
+    padding: 6px 14px; font-size: 13px; border: 1px solid #d0d7de; border-radius: 8px;
+    background: #f6f8fa; color: #1f2328; cursor: pointer;
+  }
+  .btn:hover { background: #eef1f4; }
+  .kbd { font-size: 11px; color: #8b949e; }
+  @media (max-width: 640px) { .main { flex-direction: column; } }
+</style>
+</head>
+<body>
+<header>
+  <span class="logo">🌐</span>
+  <h1>翻译</h1>
+  <span class="hint">Ctrl+Enter 立即翻译 · 输入后自动翻译</span>
+</header>
+<div class="langbar">
+  <label for="target">目标语言</label>
+  <select id="target">
+    <option value="中文">中文</option>
+    <option value="英语">英语</option>
+    <option value="日语">日语</option>
+    <option value="韩语">韩语</option>
+    <option value="法语">法语</option>
+    <option value="德语">德语</option>
+    <option value="西班牙语">西班牙语</option>
+    <option value="俄语">俄语</option>
+  </select>
+  <span id="detect" style="font-size:12px;color:#8b949e;"></span>
+</div>
+<div class="main">
+  <section class="pane">
+    <div class="pane-title"><span>输入文本</span></div>
+    <textarea id="input" placeholder="输入要翻译的文本…" spellcheck="false"></textarea>
+    <div class="meta">
+      <button class="btn" id="clear">清空</button>
+      <span class="kbd">Ctrl+Enter</span>
+    </div>
+  </section>
+  <section class="pane">
+    <div class="pane-title"><span>翻译结果</span><span class="spinner" id="spinner"></span></div>
+    <div class="result placeholder" id="result">结果将显示在这里</div>
+  </section>
+</div>
+<script>
+(function () {
+  var input = document.getElementById('input');
+  var target = document.getElementById('target');
+  var result = document.getElementById('result');
+  var spinner = document.getElementById('spinner');
+  var detect = document.getElementById('detect');
+  var clearBtn = document.getElementById('clear');
+  var timer = null;
+  var seq = 0;
+
+  var hasCJK = function (s) { return /[\u4e00-\u9fff\u3400-\u4dbf]/.test(s); };
+
+  // 语言自动检测提示：含中文字符默认译英，否则默认译中（仅影响初始下拉值）
+  function detectAndSetDefault() {
+    var text = input.value.trim();
+    if (text === '') { detect.textContent = ''; return; }
+    var lang = hasCJK(text) ? '英语' : '中文';
+    detect.textContent = '检测到输入语言，已默认翻译为「' + lang + '」（仅初始值，可手动修改）';
+    target.value = lang;
+  }
+
+  function setLoading(on) { spinner.classList.toggle('show', on); }
+
+  function translate() {
+    var text = input.value.trim();
+    var mySeq = ++seq;
+    if (text === '') {
+      result.textContent = '结果将显示在这里';
+      result.classList.add('placeholder');
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    result.classList.remove('placeholder');
+    result.classList.remove('error');
+    result.textContent = '翻译中…';
+
+    var body = {
+      model: 'Index-Translate-35B-A3B',
+      messages: [{
+        role: 'user',
+        content: '请将以下文本翻译为' + target.value + '，直接输出翻译结果，不要进行任何解释。\n\n' + text
+      }],
+      temperature: 0,
+      max_tokens: 1024,
+      chat_template_kwargs: { enable_thinking: false }
+    };
+
+    var controller = new AbortController();
+    var timeout = setTimeout(function () { controller.abort(); }, 30000);
+
+    fetch('https://index-translate.bilibili.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: controller.signal
+    }).then(function (res) {
+      clearTimeout(timeout);
+      if (mySeq !== seq) return;
+      if (!res.ok) {
+        return res.text().then(function (t) {
+          throw new Error('HTTP ' + res.status + (t ? '：' + t.slice(0, 200) : ''));
+        });
+      }
+      return res.json();
+    }).then(function (data) {
+      if (mySeq !== seq) return;
+      setLoading(false);
+      try {
+        var out = data.choices[0].message.content.trim();
+        result.textContent = out || '（空结果）';
+      } catch (e) {
+        result.classList.add('error');
+        result.textContent = '响应解析失败：' + e.message;
+      }
+    }).catch(function (err) {
+      if (mySeq !== seq) return;
+      clearTimeout(timeout);
+      setLoading(false);
+      result.classList.add('error');
+      if (err.name === 'AbortError') {
+        result.textContent = '请求超时，请重试。';
+      } else if (err.message === 'Failed to fetch' || /NetworkError/i.test(err.message)) {
+        result.textContent = '网络错误，请检查网络连接。';
+      } else {
+        result.textContent = err.message || '未知错误';
+      }
+    });
+  }
+
+  input.addEventListener('input', function () {
+    detectAndSetDefault();
+    clearTimeout(timer);
+    timer = setTimeout(translate, 800);
+  });
+  input.addEventListener('keydown', function (e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault();
+      clearTimeout(timer);
+      translate();
+    }
+  });
+  target.addEventListener('change', function () {
+    clearTimeout(timer);
+    translate();
+  });
+  clearBtn.addEventListener('click', function () {
+    input.value = '';
+    clearTimeout(timer);
+    seq++;
+    setLoading(false);
+    result.classList.add('placeholder');
+    result.classList.remove('error');
+    result.textContent = '结果将显示在这里';
+    detect.textContent = '';
+    input.focus();
+  });
+})();
+</script>
+</body>
+</html>
