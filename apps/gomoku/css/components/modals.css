@@ -1,0 +1,2 @@
+.md2-modal-overlay { position: fixed; top:0; left:0; right:0; bottom:0; background-color: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+.md2-modal { background-color: var(--md-surface); border-radius: var(--md-radius-medium); box-shadow: var(--md-shadow-4); max-width: 90%; max-height: 90%; overflow: auto; }
