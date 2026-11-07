@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Block Run · 3D 跑酷</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Logo 覆盖层 -->
+    <div id="logo-overlay" class="overlay">
+        <div class="logo-text">block run</div>
+        <div class="logo-sub">BLOCK DESERT</div>
+    </div>
+
+    <!-- 主菜单（Logo 结束后显示） -->
+    <div id="main-menu" class="menu-hidden">
+        <div class="menu-tabs">
+            <div class="menu-tab active" data-tab="0">试炼</div>
+            <div class="menu-tab" data-tab="1">挑战</div>
+            <div class="menu-tab" data-tab="2">市场</div>
+            <div class="menu-tab" data-tab="3">联机</div>
+        </div>
+        <div class="menu-content" id="menu-content">
+            <div class="tab-panel active" id="panel-trial">
+                <div class="level-list" id="trial-levels"></div>
+                <div class="loading-more" id="trial-loading">加载中...</div>
+            </div>
+            <div class="tab-panel" id="panel-challenge">
+                <div class="level-list" id="challenge-levels"></div>
+                <div class="loading-more" id="challenge-loading">加载中...</div>
+            </div>
+            <div class="tab-panel" id="panel-market">
+                <div class="placeholder-text">即将推出</div>
+            </div>
+            <div class="tab-panel" id="panel-online">
+                <div class="placeholder-text">即将推出</div>
+            </div>
+        </div>
+        <div id="menu-continue-btn" class="continue-btn">></div>
+    </div>
+
+    <!-- 游戏容器 -->
+    <div id="game-container" class="game-hidden">
+        <canvas id="game-canvas"></canvas>
+        <div id="divider"></div>
+        <div id="challenge-timer">90</div>
+    </div>
+
+    <!-- 转场遮罩 -->
+    <div id="transition-overlay"></div>
+    <!-- 关卡标题 -->
+    <div id="level-title"></div>
+    <!-- 地块提示 -->
+    <div id="tooltip"></div>
+    <!-- 跳过按钮（游戏中） -->
+    <div id="skip-btn" class="skip-game-btn">></div>
+
+    <!-- 挑战失败界面 -->
+    <div id="challenge-fail" class="fail-hidden">
+        <div class="fail-buttons">
+            <div class="fail-btn" id="fail-menu">返回主界面</div>
+            <div class="fail-btn" id="fail-retry">重来</div>
+        </div>
+    </div>
+
+    <script src="https://cdn.bootcdn.net/ajax/libs/three.js/0.160.0/three.min.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,1015 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Block Run Map Editor</title>
+    <style>
+        :root {
+            --bg: #1e1e1e;
+            --panel: #252526;
+            --input: #3c3c3c;
+            --border: #3c3c3c;
+            --text: #cccccc;
+            --text-secondary: #858585;
+            --accent: #007acc;
+            --accent-hover: #1a8ad4;
+            --danger: #c04040;
+            --green: #4a9e4a;
+            --green-hover: #5ab85a;
+            --hover: #2a2d2e;
+            --active: #37373d;
+            --statusbar: #007acc;
+            --group-header: #2d2d2d;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            font-size: 12px;
+        }
+        button {
+            background: var(--input);
+            color: var(--text);
+            border: 1px solid var(--border);
+            padding: 4px 10px;
+            cursor: pointer;
+            font-size: 12px;
+            font-family: inherit;
+            transition: background 0.1s;
+        }
+        button:hover { background: var(--hover); }
+        button.accent { background: var(--accent); border-color: var(--accent); color: #fff; }
+        button.accent:hover { background: var(--accent-hover); }
+        button.danger { background: transparent; border-color: var(--danger); color: var(--danger); }
+        button.danger:hover { background: var(--danger); color: #fff; }
+        button.green { background: var(--green); border-color: var(--green); color: #fff; }
+        button.green:hover { background: var(--green-hover); }
+        input[type="number"], input[type="text"] {
+            background: var(--input);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 4px 6px;
+            font-size: 12px;
+            font-family: 'Consolas', 'Courier New', monospace;
+            width: 100%;
+        }
+        input[type="number"]:focus, input[type="text"]:focus { outline: none; border-color: var(--accent); }
+        input[type="checkbox"] { width: 14px; height: 14px; cursor: pointer; accent-color: var(--accent); flex-shrink: 0; }
+        select {
+            background: var(--input); border: 1px solid var(--border); color: var(--text);
+            padding: 4px 6px; font-size: 12px; font-family: inherit; cursor: pointer; width: 100%;
+        }
+        select:focus { outline: none; border-color: var(--accent); }
+
+        #main-row { flex: 1; display: flex; overflow: hidden; }
+
+        /* 左侧面板 */
+        #left-panel {
+            width: 280px; min-width: 160px; background: var(--panel);
+            border-right: 1px solid var(--border); display: flex; flex-direction: column; user-select: none;
+        }
+        #left-top { flex: 1; display: flex; flex-direction: column; overflow: hidden; border-bottom: 1px solid var(--border); }
+        #left-bottom { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+        #map-list, #outline-list { flex: 1; overflow-y: auto; padding: 4px 0; }
+
+        .section-header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 8px 14px; user-select: none; font-size: 11px; font-weight: 600;
+            text-transform: uppercase; letter-spacing: 1px; color: var(--text);
+        }
+
+        .list-item {
+            padding: 5px 14px; cursor: pointer; display: flex; align-items: center; gap: 6px;
+            font-size: 12px; color: var(--text); transition: background 0.1s; border-left: 2px solid transparent;
+        }
+        .list-item:hover { background: var(--hover); }
+        .list-item.active { background: var(--active); border-left-color: var(--accent); color: #fff; }
+        .list-item .item-icon { width: 14px; text-align: center; font-size: 10px; color: var(--text-secondary); flex-shrink: 0; }
+        .list-item .item-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .list-item.outline-platform { padding-left: 22px; }
+        .list-item.outline-wall { padding-left: 22px; }
+
+        .resize-handle {
+            width: 5px; cursor: col-resize; background: var(--border); flex-shrink: 0; transition: background 0.15s;
+        }
+        .resize-handle:hover, .resize-handle.active { background: var(--accent); }
+
+        /* 中间画布 */
+        #canvas-container { flex: 1; position: relative; background: #000; min-width: 200px; }
+        #canvas-container canvas { display: block; }
+        #run-bar {
+            position: absolute; top: 0; left: 0; right: 0; padding: 6px 10px;
+            display: flex; align-items: center; gap: 8px; background: rgba(0,0,0,0.5); z-index: 10;
+        }
+        #run-hint { color: var(--text-secondary); font-size: 11px; }
+
+        /* 右侧面板 - 分割线加子属性 */
+        #right-panel {
+            width: 270px; min-width: 230px; background: var(--panel);
+            border-left: 1px solid var(--border); overflow-y: auto; display: flex; flex-direction: column;
+            padding: 10px; gap: 2px;
+        }
+
+        .attr-section {
+            border-top: 1px solid var(--border);
+            padding: 8px 0;
+        }
+        .attr-section:first-child { border-top: none; }
+
+        .attr-section .section-title {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text);
+            margin-bottom: 6px;
+            padding-left: 2px;
+        }
+
+        .attr-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 3px 0 3px 8px;
+        }
+        .attr-row label {
+            width: 55px;
+            text-align: right;
+            font-size: 11px;
+            color: var(--text-secondary);
+            flex-shrink: 0;
+        }
+        .attr-row input[type="number"] { flex: 1; min-width: 40px; }
+        .attr-row input[type="text"] { flex: 1; min-width: 40px; }
+        .attr-row input[type="checkbox"] { flex: none; }
+
+        .attr-sub {
+            border-left: 2px solid var(--accent);
+            margin-left: 4px;
+            padding-left: 8px;
+            margin-top: 2px;
+        }
+
+        #empty-state {
+            display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 24px 0;
+        }
+        #empty-state p { color: var(--text-secondary); font-size: 12px; text-align: center; line-height: 1.5; }
+        #empty-state .create-buttons { display: flex; gap: 6px; }
+
+        #statusbar {
+            height: 22px; background: var(--statusbar); color: #fff;
+            display: flex; align-items: center; padding: 0 10px; font-size: 11px;
+            gap: 16px; flex-shrink: 0; user-select: none;
+        }
+
+        .context-menu {
+            position: fixed; background: var(--panel); border: 1px solid var(--border);
+            z-index: 1000; padding: 2px 0; min-width: 130px; box-shadow: 0 4px 16px rgba(0,0,0,0.6);
+        }
+        .context-menu-item { padding: 5px 18px; cursor: pointer; font-size: 12px; color: var(--text); }
+        .context-menu-item:hover { background: #094771; }
+
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); z-index: 2000; display: flex; align-items: center; justify-content: center;
+        }
+        .modal {
+            background: var(--panel); border: 1px solid var(--border);
+            padding: 18px 22px; min-width: 320px; box-shadow: 0 8px 32px rgba(0,0,0,0.7);
+        }
+        .modal h3 { font-size: 13px; font-weight: 600; margin-bottom: 14px; color: #fff; }
+        .modal .info-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 12px; }
+        .modal .info-row .label { color: var(--text-secondary); }
+        .modal .info-row .value { color: var(--text); font-family: 'Consolas', monospace; }
+        .modal button { margin-top: 14px; width: 100%; }
+
+        #game-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 3000; background: #000; display: none;
+        }
+        #game-overlay canvas { display: block; width: 100%; height: 100%; }
+        #game-overlay .exit-btn {
+            position: absolute; top: 10px; right: 10px; z-index: 10;
+            background: var(--danger); color: #fff; border: 1px solid var(--danger);
+            padding: 6px 14px; font-size: 12px; cursor: pointer;
+        }
+        #game-overlay .hint {
+            position: absolute; top: 10px; left: 10px; z-index: 10;
+            color: #fff; font-size: 11px; opacity: 0.7;
+        }
+
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #424242; }
+        ::-webkit-scrollbar-thumb:hover { background: #555; }
+    </style>
+</head>
+<body>
+    <div id="main-row">
+        <!-- 左侧面板 -->
+        <div id="left-panel">
+            <div id="left-top">
+                <div class="section-header">地图文件<button id="add-btn" style="padding:1px 7px;font-size:14px;line-height:1;">+</button></div>
+                <div id="map-list"></div>
+            </div>
+            <div id="left-bottom">
+                <div class="section-header">控件列表</div>
+                <div id="outline-list"></div>
+            </div>
+        </div>
+        <div class="resize-handle" id="resize-left"></div>
+
+        <!-- 中间画布 -->
+        <div id="canvas-container">
+            <div id="run-bar">
+                <button id="run-btn">Run</button>
+                <button id="game-btn" class="green">Run Game</button>
+                <span id="run-hint"></span>
+            </div>
+        </div>
+
+        <div class="resize-handle" id="resize-right"></div>
+
+        <!-- 右侧属性面板（分割线加子属性） -->
+        <div id="right-panel">
+            <div class="section-header" style="padding:4px 0;">属性</div>
+            <div id="empty-state">
+                <p>未选中任何控件<br>选择控件或创建新控件</p>
+                <div class="create-buttons">
+                    <button class="accent" id="create-platform">新建平台</button>
+                    <button class="accent" id="create-wall">新建墙壁</button>
+                </div>
+            </div>
+            <div id="props-content" style="display:none;">
+                <div class="attr-section">
+                    <div class="section-title">基本信息</div>
+                    <div class="attr-row"><label>ID</label><input type="text" id="prop-id" readonly></div>
+                </div>
+                <div class="attr-section">
+                    <div class="section-title">变换</div>
+                    <div class="attr-row"><label>位置 X</label><input type="number" id="prop-posx" step="0.5"></div>
+                    <div class="attr-row"><label>位置 Y</label><input type="number" id="prop-posy" step="0.5"></div>
+                    <div class="attr-row"><label>位置 Z</label><input type="number" id="prop-posz" step="0.5"></div>
+                </div>
+                <div class="attr-section">
+                    <div class="section-title">尺寸</div>
+                    <div class="attr-row"><label>长 (X)</label><input type="number" id="prop-length" step="0.5" min="0.5"></div>
+                    <div class="attr-row"><label>宽 (Z)</label><input type="number" id="prop-width" step="0.5" min="0.5"></div>
+                    <div class="attr-row"><label>高 (Y)</label><input type="number" id="prop-height" step="0.5" min="0.5"></div>
+                </div>
+                <div class="attr-section">
+                    <div class="section-title">类型</div>
+                    <div class="attr-row"><label>终点</label><input type="checkbox" id="prop-isgoal"></div>
+                    <div class="attr-row"><label>移动平台</label><input type="checkbox" id="prop-ismoving"></div>
+                    <div id="moving-params" style="display:none;" class="attr-sub">
+                        <div class="attr-row"><label>移动轴</label><select id="prop-moveaxis"><option value="x">X</option><option value="y">Y</option><option value="z">Z</option></select></div>
+                        <div class="attr-row"><label>起点</label><input type="number" id="prop-movemin" step="0.5"></div>
+                        <div class="attr-row"><label>终点</label><input type="number" id="prop-movemax" step="0.5"></div>
+                        <div class="attr-row"><label>速度</label><input type="number" id="prop-speed" step="0.1" min="0.1" value="0.5"></div>
+                    </div>
+                </div>
+                <div class="attr-section">
+                    <div class="section-title">提示文本</div>
+                    <div class="attr-row"><label>中文</label><input type="text" id="prop-tooltip" placeholder="可选"></div>
+                    <div class="attr-row"><label>英文</label><input type="text" id="prop-tooltip-en" placeholder="Optional"></div>
+                </div>
+                <div style="margin-top:8px;">
+                    <button class="danger" id="delete-btn" style="width:100%;">删除控件</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 底栏 -->
+    <div id="statusbar">
+        <span>平台: <b id="stat-platforms">0</b></span>
+        <span>墙壁: <b id="stat-walls">0</b></span>
+        <span>移动: <b id="stat-moving">0</b></span>
+        <span>终点: <b id="stat-goal">0</b></span>
+        <span>总计: <b id="stat-total">0</b></span>
+        <span style="margin-left:auto;opacity:0.7;">Ctrl+S 保存</span>
+    </div>
+
+    <!-- 右键菜单 -->
+    <div id="context-menu" class="context-menu" style="display:none;"></div>
+    <!-- 属性弹窗 -->
+    <div id="modal-container"></div>
+
+    <!-- Run Game 覆盖层 -->
+    <div id="game-overlay">
+        <canvas id="game-canvas"></canvas>
+        <button class="exit-btn" id="game-exit-btn">Exit (Esc)</button>
+        <div class="hint">WASD 移动 | Space 跳跃 | 鼠标视角 | Esc 退出</div>
+    </div>
+
+    <script type="importmap">
+        { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+    </script>
+    <script type="module">
+        import * as THREE from 'three';
+
+        // ===================== 全局状态 =====================
+        let currentMapName = null, mapData = null, sceneObjects = [], selectedObject = null;
+        let isRunMode = false, isGameMode = false;
+        let pointerLocked = false, runCamera = null, editorCamera, renderer, scene;
+        let clock = new THREE.Clock(), dynamicObjects = [], animationId;
+        const keys = { w: false, a: false, s: false, d: false, q: false, e: false, space: false };
+        const euler = new THREE.Euler(0, 0, 0, 'YXZ');
+        const MOUSE_SENSITIVITY = 0.4;
+
+        // 游戏模式相关
+        let gameRenderer = null, gameScene = null, gameCamera = null;
+        let gamePlayer = null, gameWorldMeshes = [], gameWallMeshes = [], gameDynamicObjects = [];
+        let gameGoalMesh = null, gameGoalTimer = 0;
+        const GAME_GRAVITY = 22, GAME_JUMP_FORCE = 14, GAME_SPEED = 9;
+        const PLAYER_HEIGHT = 1.6, PLAYER_RADIUS = 0.4;
+
+        // ===================== 场景初始化 =====================
+        const container = document.getElementById('canvas-container');
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        renderer.shadowMap.enabled = true;
+        container.appendChild(renderer.domElement);
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color('#2a2a2a');
+        editorCamera = new THREE.PerspectiveCamera(55, container.clientWidth / container.clientHeight, 0.5, 500);
+        editorCamera.position.set(25, 30, 40);
+        editorCamera.lookAt(0, 3, -5);
+        const ambient = new THREE.AmbientLight('#666666', 0.7); scene.add(ambient);
+        const dirLight = new THREE.DirectionalLight('#ffffff', 0.7);
+        dirLight.position.set(30, 50, 20); dirLight.castShadow = true;
+        dirLight.shadow.mapSize.width = 1024; dirLight.shadow.mapSize.height = 1024;
+        scene.add(dirLight);
+        scene.add(new THREE.GridHelper(120, 60, '#444444', '#2a2a2a'));
+
+        // ===================== 分隔条拖拽 =====================
+        ['resize-left','resize-right'].forEach((id, idx) => {
+            const handle = document.getElementById(id);
+            const panelId = idx === 0 ? 'left-panel' : 'right-panel';
+            handle.addEventListener('mousedown', (e) => {
+                const panel = document.getElementById(panelId);
+                const startX = e.clientX, startWidth = panel.offsetWidth;
+                handle.classList.add('active');
+                document.body.style.cursor = 'col-resize';
+                document.body.style.userSelect = 'none';
+                const onMove = (ev) => {
+                    const dx = ev.clientX - startX;
+                    const newWidth = idx === 0 ? startWidth + dx : startWidth - dx;
+                    if (newWidth >= 150) panel.style.width = newWidth + 'px';
+                };
+                const onUp = () => {
+                    handle.classList.remove('active');
+                    document.body.style.cursor = '';
+                    document.body.style.userSelect = '';
+                    document.removeEventListener('mousemove', onMove);
+                    document.removeEventListener('mouseup', onUp);
+                    renderer.setSize(container.clientWidth, container.clientHeight);
+                    editorCamera.aspect = container.clientWidth / container.clientHeight;
+                    editorCamera.updateProjectionMatrix();
+                };
+                document.addEventListener('mousemove', onMove);
+                document.addEventListener('mouseup', onUp);
+            });
+        });
+
+        // ===================== 工具函数 =====================
+        function getNextId() {
+            let maxId = 0;
+            (mapData?.platforms || []).forEach(p => { if (p.id && /^\d+$/.test(p.id)) maxId = Math.max(maxId, +p.id); });
+            (mapData?.walls || []).forEach(w => { if (w.id && /^\d+$/.test(w.id)) maxId = Math.max(maxId, +w.id); });
+            return String(maxId + 1);
+        }
+        function assignMissingIds(data) {
+            if (!data.ver || parseFloat(data.ver) < 2.0) {
+                (data.platforms || []).forEach(p => { if (!p.id) p.id = getNextId(); });
+                (data.walls || []).forEach(w => { if (!w.id) w.id = getNextId(); });
+                data.ver = '2.0';
+            }
+        }
+        function createIdTexture(id, bg) {
+            const c = document.createElement('canvas'); c.width = 256; c.height = 256;
+            const ctx = c.getContext('2d');
+            ctx.fillStyle = bg; ctx.fillRect(0, 0, 256, 256);
+            const fg = (bg === '#ffffff' || bg === '#e8d5a3') ? '#000' : '#fff';
+            const fs = Math.min(72, 180 / Math.max(id.length, 1));
+            ctx.fillStyle = fg; ctx.font = `bold ${fs}px Consolas, monospace`;
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText(id, 128, 128);
+            const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+        }
+        function addObjectToScene(d, type) {
+            const w = d.width || 10, h = d.height || 0.5, dp = d.depth || 10;
+            const geo = new THREE.BoxGeometry(w, h, dp);
+            const isGoal = d.isGoal || false;
+            const bg = isGoal ? '#ffffff' : (type === 'wall' ? '#606060' : '#2a2a2a');
+            const mat = new THREE.MeshStandardMaterial({ map: createIdTexture(d.id || '?', bg), roughness: 0.65, metalness: 0.05 });
+            const mesh = new THREE.Mesh(geo, mat); mesh.castShadow = true; mesh.receiveShadow = true;
+            const px = Array.isArray(d.x) ? (d.x[0] + d.x[1]) / 2 : (d.x ?? 0);
+            const py = Array.isArray(d.y) ? (d.y[0] + d.y[1]) / 2 : (d.y ?? 0);
+            const pz = Array.isArray(d.z) ? (d.z[0] + d.z[1]) / 2 : (d.z ?? 0);
+            mesh.position.set(px, py, pz);
+            mesh.userData = { id: d.id, type, isGoal, isDynamic: false };
+            scene.add(mesh);
+            const edge = new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({ color: 0x666666, transparent: true, opacity: 0.5 }));
+            mesh.add(edge);
+            const axes = [];
+            if (Array.isArray(d.x) && d.x.length >= 2) axes.push({ axis: 'x', range: d.x, speed: d.speed || 0.5 });
+            if (Array.isArray(d.y) && d.y.length >= 2) axes.push({ axis: 'y', range: d.y, speed: d.speed || 0.5 });
+            if (Array.isArray(d.z) && d.z.length >= 2) axes.push({ axis: 'z', range: d.z, speed: d.speed || 0.5 });
+            if (axes.length) { dynamicObjects.push({ mesh, axes, startTime: performance.now() / 1000 }); mesh.userData.isDynamic = true; }
+            const entry = { mesh, data: d, type }; sceneObjects.push(entry); return entry;
+        }
+        function rebuildScene() {
+            while (scene.children.length) scene.remove(scene.children[0]);
+            scene.add(ambient); scene.add(dirLight);
+            scene.add(new THREE.GridHelper(120, 60, '#444444', '#2a2a2a'));
+            sceneObjects = []; dynamicObjects = [];
+            if (!mapData) return;
+            (mapData.platforms || []).forEach(p => addObjectToScene(p, 'platform'));
+            (mapData.walls || []).forEach(w => addObjectToScene(w, 'wall'));
+            renderOutline(); updateStatusbar();
+        }
+        function updateDynamicObjects(now) {
+            for (const dyn of dynamicObjects) {
+                const elapsed = now - dyn.startTime;
+                for (const a of dyn.axes) {
+                    const t = Math.sin(elapsed * a.speed * 2 * Math.PI) * 0.5 + 0.5;
+                    const v = a.range[0] + (a.range[1] - a.range[0]) * t;
+                    if (a.axis === 'x') dyn.mesh.position.x = v;
+                    else if (a.axis === 'y') dyn.mesh.position.y = v;
+                    else dyn.mesh.position.z = v;
+                }
+            }
+        }
+        function updateStatusbar() {
+            const plat = (mapData?.platforms || []).length;
+            const wall = (mapData?.walls || []).length;
+            const moving = (mapData?.platforms || []).filter(p => (Array.isArray(p.x)||Array.isArray(p.y)||Array.isArray(p.z)) && (p.x?.length>=2||p.y?.length>=2||p.z?.length>=2)).length +
+                           (mapData?.walls || []).filter(w => (Array.isArray(w.x)||Array.isArray(w.y)||Array.isArray(w.z)) && (w.x?.length>=2||w.y?.length>=2||w.z?.length>=2)).length;
+            const goal = (mapData?.platforms || []).filter(p => p.isGoal).length;
+            document.getElementById('stat-platforms').textContent = plat;
+            document.getElementById('stat-walls').textContent = wall;
+            document.getElementById('stat-moving').textContent = moving;
+            document.getElementById('stat-goal').textContent = goal;
+            document.getElementById('stat-total').textContent = plat + wall;
+        }
+
+        // ===================== 选中与属性面板 =====================
+        function selectObject(obj) {
+            if (selectedObject?.mesh) { selectedObject.mesh.material.emissive?.setHex(0x000000); selectedObject.mesh.material.emissiveIntensity = 0; }
+            selectedObject = obj;
+            if (obj?.mesh) {
+                obj.mesh.material.emissive = new THREE.Color(0x333333); obj.mesh.material.emissiveIntensity = 0.4;
+                showProperties(obj);
+                document.getElementById('empty-state').style.display = 'none';
+                document.getElementById('props-content').style.display = 'block';
+            } else {
+                document.getElementById('empty-state').style.display = 'flex';
+                document.getElementById('props-content').style.display = 'none';
+            }
+            renderOutline();
+        }
+        function showProperties(obj) {
+            const d = obj.data;
+            document.getElementById('prop-id').value = d.id || '';
+            document.getElementById('prop-length').value = d.width ?? 10;
+            document.getElementById('prop-width').value = d.depth ?? 10;
+            document.getElementById('prop-height').value = d.height ?? 0.5;
+            document.getElementById('prop-posx').value = Array.isArray(d.x) ? (d.x[0]+d.x[1])/2 : (d.x ?? 0);
+            document.getElementById('prop-posy').value = Array.isArray(d.y) ? (d.y[0]+d.y[1])/2 : (d.y ?? 0);
+            document.getElementById('prop-posz').value = Array.isArray(d.z) ? (d.z[0]+d.z[1])/2 : (d.z ?? 0);
+            document.getElementById('prop-isgoal').checked = d.isGoal || false;
+            const isMoving = (Array.isArray(d.x)&&d.x.length>=2) || (Array.isArray(d.y)&&d.y.length>=2) || (Array.isArray(d.z)&&d.z.length>=2);
+            document.getElementById('prop-ismoving').checked = isMoving;
+            const mp = document.getElementById('moving-params');
+            mp.style.display = isMoving ? 'block' : 'none';
+            if (isMoving) {
+                const axis = Array.isArray(d.x)&&d.x.length>=2 ? 'x' : (Array.isArray(d.y)&&d.y.length>=2 ? 'y' : (Array.isArray(d.z)&&d.z.length>=2 ? 'z' : 'x'));
+                document.getElementById('prop-moveaxis').value = axis;
+                document.getElementById('prop-movemin').value = d[axis]?.[0] ?? 0;
+                document.getElementById('prop-movemax').value = d[axis]?.[1] ?? 0;
+                document.getElementById('prop-speed').value = d.speed || 0.5;
+            }
+            document.getElementById('prop-tooltip').value = d.tooltip || '';
+            document.getElementById('prop-tooltip-en').value = d.tooltip_en || '';
+        }
+        function applyPropertyChange() {
+            if (!selectedObject) return;
+            const d = selectedObject.data;
+            d.width = parseFloat(document.getElementById('prop-length').value) || 10;
+            d.depth = parseFloat(document.getElementById('prop-width').value) || 10;
+            d.height = parseFloat(document.getElementById('prop-height').value) || 0.5;
+            const isMoving = document.getElementById('prop-ismoving').checked;
+            delete d.x; delete d.y; delete d.z; delete d.speed;
+            if (isMoving) {
+                const axis = document.getElementById('prop-moveaxis').value;
+                const min = parseFloat(document.getElementById('prop-movemin').value) || 0;
+                const max = parseFloat(document.getElementById('prop-movemax').value) || 0;
+                d.speed = parseFloat(document.getElementById('prop-speed').value) || 0.5;
+                d[axis] = [min, max];
+            } else {
+                d.x = parseFloat(document.getElementById('prop-posx').value) || 0;
+                d.y = parseFloat(document.getElementById('prop-posy').value) || 0;
+                d.z = parseFloat(document.getElementById('prop-posz').value) || 0;
+            }
+            d.isGoal = document.getElementById('prop-isgoal').checked;
+            d.tooltip = document.getElementById('prop-tooltip').value;
+            d.tooltip_en = document.getElementById('prop-tooltip-en').value;
+            const id = d.id;
+            rebuildScene();
+            const newObj = sceneObjects.find(o => o.data.id === id);
+            if (newObj) selectObject(newObj);
+            saveCurrentMap();
+        }
+
+        // ===================== 文件管理 =====================
+        function loadMapList() {
+            const maps = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key.startsWith('map_')) try { maps.push({ name: key.substring(4), data: JSON.parse(localStorage.getItem(key)) }); } catch(e){}
+            }
+            return maps.sort((a,b) => a.name.localeCompare(b.name));
+        }
+        function renderMapList() {
+            const el = document.getElementById('map-list'); el.innerHTML = '';
+            loadMapList().forEach(m => {
+                const div = document.createElement('div');
+                div.className = 'list-item' + (currentMapName === m.name ? ' active' : '');
+                div.innerHTML = `<span class="item-icon">&#9632;</span><span class="item-name">${escapeHtml(m.name)}</span>`;
+                div.addEventListener('click', () => switchMap(m.name));
+                div.addEventListener('contextmenu', e => { e.preventDefault(); showContextMenu(e.clientX, e.clientY, [
+                    { label: '属性', action: () => showMapPropertiesModal(m.name, m.data) },
+                    { label: '删除', action: () => deleteMap(m.name) }
+                ]);});
+                el.appendChild(div);
+            });
+        }
+        function renderOutline() {
+            const el = document.getElementById('outline-list'); el.innerHTML = '';
+            if (!mapData) return;
+            (mapData.platforms || []).forEach(p => {
+                const sel = selectedObject?.data.id === p.id;
+                const div = document.createElement('div');
+                div.className = 'list-item outline-platform' + (sel ? ' active' : '');
+                div.innerHTML = `<span class="item-icon">P</span><span class="item-name">${escapeHtml(p.id)} - 平台</span>`;
+                div.addEventListener('click', () => { const o = sceneObjects.find(o=>o.data.id===p.id); if(o) selectObject(o); });
+                div.addEventListener('contextmenu', e => { e.preventDefault(); showContextMenu(e.clientX, e.clientY, [
+                    { label: '删除控件', action: () => deleteControlById(p.id, 'platform') }
+                ]);});
+                el.appendChild(div);
+            });
+            (mapData.walls || []).forEach(w => {
+                const sel = selectedObject?.data.id === w.id;
+                const div = document.createElement('div');
+                div.className = 'list-item outline-wall' + (sel ? ' active' : '');
+                div.innerHTML = `<span class="item-icon">W</span><span class="item-name">${escapeHtml(w.id)} - 墙壁</span>`;
+                div.addEventListener('click', () => { const o = sceneObjects.find(o=>o.data.id===w.id); if(o) selectObject(o); });
+                div.addEventListener('contextmenu', e => { e.preventDefault(); showContextMenu(e.clientX, e.clientY, [
+                    { label: '删除控件', action: () => deleteControlById(w.id, 'wall') }
+                ]);});
+                el.appendChild(div);
+            });
+        }
+        function deleteControlById(id, type) {
+            if (!mapData) return;
+            if (type === 'platform') mapData.platforms = mapData.platforms.filter(p => p.id !== id);
+            else mapData.walls = mapData.walls.filter(w => w.id !== id);
+            if (selectedObject?.data.id === id) selectObject(null);
+            rebuildScene(); saveCurrentMap();
+        }
+        function escapeHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+        function switchMap(name) {
+            saveCurrentMap();
+            const raw = localStorage.getItem('map_' + name);
+            if (!raw) return;
+            try {
+                mapData = JSON.parse(raw); assignMissingIds(mapData);
+                currentMapName = name; rebuildScene(); selectObject(null); renderMapList();
+            } catch(e) { alert('地图数据损坏'); }
+        }
+        function saveCurrentMap() { if (currentMapName && mapData) { localStorage.setItem('map_' + currentMapName, JSON.stringify(mapData)); updateStatusbar(); } }
+        function showMapPropertiesModal(name, data) {
+            const plat = (data.platforms||[]).length, wall = (data.walls||[]).length;
+            const moving = (data.platforms||[]).filter(p => (Array.isArray(p.x)||Array.isArray(p.y)||Array.isArray(p.z))&&(p.x?.length>=2||p.y?.length>=2||p.z?.length>=2)).length +
+                           (data.walls||[]).filter(w => (Array.isArray(w.x)||Array.isArray(w.y)||Array.isArray(w.z))&&(w.x?.length>=2||w.y?.length>=2||w.z?.length>=2)).length;
+            const goal = (data.platforms||[]).filter(p=>p.isGoal).length;
+            const overlay = document.createElement('div'); overlay.className = 'modal-overlay';
+            overlay.innerHTML = `<div class="modal"><h3>地图属性 - ${escapeHtml(name)}</h3>
+                <div class="info-row"><span class="label">版本号</span><span class="value">${escapeHtml(data.ver||'未知')}</span></div>
+                <div class="info-row"><span class="label">名称</span><span class="value">${escapeHtml(data.name||name)}</span></div>
+                <div class="info-row"><span class="label">平台</span><span class="value">${plat}</span></div>
+                <div class="info-row"><span class="label">墙壁</span><span class="value">${wall}</span></div>
+                <div class="info-row"><span class="label">移动</span><span class="value">${moving}</span></div>
+                <div class="info-row"><span class="label">终点</span><span class="value">${goal}</span></div>
+                <div class="info-row"><span class="label">总计</span><span class="value">${plat+wall}</span></div>
+                <div class="info-row"><span class="label">出生点</span><span class="value">${data.startPosition?`(${data.startPosition.x},${data.startPosition.y},${data.startPosition.z})`:'未设置'}</span></div>
+                <button id="modal-close">关闭</button></div>`;
+            document.body.appendChild(overlay);
+            overlay.addEventListener('click', e => { if(e.target===overlay) overlay.remove(); });
+            overlay.querySelector('#modal-close').addEventListener('click', () => overlay.remove());
+        }
+        function deleteMap(name) {
+            if (!confirm(`确定删除地图 "${name}"？`)) return;
+            localStorage.removeItem('map_' + name);
+            if (currentMapName === name) { currentMapName = null; mapData = null; rebuildScene(); selectObject(null); }
+            renderMapList();
+        }
+        function createNewMap() {
+            let name = 'untitled', i = 1;
+            while (localStorage.getItem('map_' + name)) name = 'untitled_' + (i++);
+            const d = { ver:'2.0', name, startPosition:{x:0,y:3,z:0}, platforms:[{id:'1',x:0,y:0.5,z:0,width:20,depth:20,height:1,tooltip:'',tooltip_en:'',isGoal:false}], walls:[], decorations:[] };
+            localStorage.setItem('map_'+name, JSON.stringify(d));
+            switchMap(name);
+        }
+        function uploadMap() {
+            const inp = document.createElement('input'); inp.type='file'; inp.accept='.json';
+            inp.onchange = e => {
+                const f = e.target.files[0]; if(!f) return;
+                const r = new FileReader();
+                r.onload = ev => {
+                    try {
+                        const data = JSON.parse(ev.target.result); assignMissingIds(data);
+                        let name = data.name || 'uploaded';
+                        while(localStorage.getItem('map_'+name)) name += '_1';
+                        localStorage.setItem('map_'+name, JSON.stringify(data));
+                        switchMap(name);
+                    } catch(ex) { alert('无效JSON'); }
+                };
+                r.readAsText(f);
+            };
+            inp.click();
+        }
+        function downloadMap() {
+            if (!mapData) return;
+            saveCurrentMap();
+            const blob = new Blob([JSON.stringify(mapData,null,2)],{type:'application/json'});
+            const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+            a.download = (currentMapName||'level')+'.json'; a.click();
+            URL.revokeObjectURL(a.href);
+        }
+        function createNewControl(type) {
+            if (!mapData) return;
+            const id = getNextId();
+            const dir = new THREE.Vector3(0,0,-1).applyQuaternion(editorCamera.quaternion).normalize();
+            const sp = editorCamera.position.clone().addScaledVector(dir, 15);
+            const obj = { id, x: Math.round(sp.x), y: Math.round(sp.y), z: Math.round(sp.z), width:4, depth:4, height:1, tooltip:'', tooltip_en:'', isGoal:false };
+            if (type==='platform') { if(!mapData.platforms) mapData.platforms=[]; mapData.platforms.push(obj); }
+            else { if(!mapData.walls) mapData.walls=[]; mapData.walls.push(obj); }
+            rebuildScene();
+            const o = sceneObjects.find(o=>o.data.id===id);
+            if(o) selectObject(o);
+            saveCurrentMap();
+        }
+
+        // ===================== 右键菜单 =====================
+        const ctxMenu = document.getElementById('context-menu');
+        function showContextMenu(x, y, items) {
+            ctxMenu.innerHTML = '';
+            items.forEach(it => {
+                const div = document.createElement('div'); div.className = 'context-menu-item';
+                div.textContent = it.label;
+                div.addEventListener('click', () => { it.action(); hideContextMenu(); });
+                ctxMenu.appendChild(div);
+            });
+            ctxMenu.style.left = x + 'px'; ctxMenu.style.top = y + 'px'; ctxMenu.style.display = 'block';
+            setTimeout(() => document.addEventListener('click', hideContextMenu, { once: true }), 50);
+        }
+        function hideContextMenu() { ctxMenu.style.display = 'none'; }
+
+        // ===================== Run 模式（编辑预览） =====================
+        const runBtn = document.getElementById('run-btn'), runHint = document.getElementById('run-hint');
+        runBtn.addEventListener('click', () => isRunMode ? exitRunMode() : enterRunMode());
+        function enterRunMode() {
+            if (!mapData) return;
+            isRunMode = true; runBtn.textContent = 'Exit (Esc)'; runBtn.classList.add('accent');
+            runHint.textContent = 'WASD + Mouse | Esc 退出';
+            runCamera = new THREE.PerspectiveCamera(75, container.clientWidth/container.clientHeight, 0.1, 300);
+            const sp = mapData.startPosition;
+            runCamera.position.set(sp.x, sp.y, sp.z); euler.set(0,0,0,'YXZ'); runCamera.quaternion.setFromEuler(euler);
+            renderer.domElement.requestPointerLock();
+            document.addEventListener('pointerlockchange', onLock); document.addEventListener('mousemove', onMouseRun);
+            window.addEventListener('keydown', onKeyRun); window.addEventListener('keyup', onKeyUpRun);
+        }
+        function exitRunMode() {
+            isRunMode = false; runBtn.textContent = 'Run'; runBtn.classList.remove('accent'); runHint.textContent = '';
+            if (document.pointerLockElement === renderer.domElement) document.exitPointerLock();
+            document.removeEventListener('pointerlockchange', onLock); document.removeEventListener('mousemove', onMouseRun);
+            window.removeEventListener('keydown', onKeyRun); window.removeEventListener('keyup', onKeyUpRun);
+            runCamera = null;
+        }
+        function onLock() { pointerLocked = document.pointerLockElement === renderer.domElement; }
+        function onMouseRun(e) {
+            if (!pointerLocked || !isRunMode) return;
+            euler.setFromQuaternion(runCamera.quaternion);
+            euler.y -= e.movementX * MOUSE_SENSITIVITY * 0.01;
+            euler.x -= e.movementY * MOUSE_SENSITIVITY * 0.01;
+            euler.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, euler.x));
+            runCamera.quaternion.setFromEuler(euler);
+        }
+        function onKeyRun(e) {
+            if (!isRunMode && !isGameMode) return;
+            if (e.key === 'Escape') { if (isGameMode) exitGameMode(); else exitRunMode(); return; }
+            if (['w','a','s','d','q','e',' '].includes(e.key.toLowerCase())) {
+                const k = e.key === ' ' ? 'space' : e.key.toLowerCase();
+                keys[k] = true; e.preventDefault();
+            }
+        }
+        function onKeyUpRun(e) {
+            const k = e.key === ' ' ? 'space' : e.key.toLowerCase();
+            if (['w','a','s','d','q','e','space'].includes(k)) keys[k] = false;
+        }
+        function updateRunMovement(dt) {
+            if (!runCamera || !isRunMode) return;
+            const speed = 15 * Math.min(dt, 0.1);
+            const fwd = new THREE.Vector3(0,0,-1).applyQuaternion(runCamera.quaternion).normalize();
+            const right = new THREE.Vector3(1,0,0);
+            if (keys.w) runCamera.position.addScaledVector(fwd, speed);
+            if (keys.s) runCamera.position.addScaledVector(fwd, -speed);
+            if (keys.a) runCamera.position.addScaledVector(right, -speed);
+            if (keys.d) runCamera.position.addScaledVector(right, speed);
+            if (keys.q) runCamera.position.y -= speed;
+            if (keys.e) runCamera.position.y += speed;
+        }
+
+        // ===================== Run Game 模式（完整玩法测试） =====================
+        const gameBtn = document.getElementById('game-btn');
+        const gameOverlay = document.getElementById('game-overlay');
+        const gameCanvas = document.getElementById('game-canvas');
+        const gameExitBtn = document.getElementById('game-exit-btn');
+        gameBtn.addEventListener('click', enterGameMode);
+        gameExitBtn.addEventListener('click', exitGameMode);
+
+        function enterGameMode() {
+            if (!mapData) return;
+            isGameMode = true;
+            gameOverlay.style.display = 'block';
+            gameScene = new THREE.Scene();
+            gameScene.background = new THREE.Color('#2a2a2a');
+            gameScene.fog = new THREE.Fog('#2a2a2a', 30, 120);
+            gameRenderer = new THREE.WebGLRenderer({ canvas: gameCanvas, antialias: true });
+            gameRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            gameRenderer.setSize(window.innerWidth, window.innerHeight);
+            gameRenderer.shadowMap.enabled = true;
+            gameScene.add(new THREE.AmbientLight('#666666', 0.7));
+            const dl = new THREE.DirectionalLight('#ffffff', 0.7);
+            dl.position.set(30, 50, 20); dl.castShadow = true;
+            dl.shadow.mapSize.width = 1024; dl.shadow.mapSize.height = 1024;
+            gameScene.add(dl);
+            gameWorldMeshes = []; gameWallMeshes = []; gameDynamicObjects = []; gameGoalMesh = null; gameGoalTimer = 0;
+            (mapData.platforms || []).forEach(p => {
+                const w = p.width || 10, d = p.depth || 10, h = p.height || 0.5;
+                const geo = new THREE.BoxGeometry(w, h, d);
+                const color = p.isGoal ? '#ffffff' : '#404040';
+                const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.6, metalness: 0.1 });
+                const mesh = new THREE.Mesh(geo, mat);
+                const px = Array.isArray(p.x) ? (p.x[0]+p.x[1])/2 : (p.x ?? 0);
+                const py = Array.isArray(p.y) ? (p.y[0]+p.y[1])/2 : (p.y ?? 0);
+                const pz = Array.isArray(p.z) ? (p.z[0]+p.z[1])/2 : (p.z ?? 0);
+                mesh.position.set(px, py, pz);
+                mesh.receiveShadow = true; mesh.castShadow = true;
+                mesh.userData = { isGround: true, isGoal: p.isGoal || false };
+                if (p.isGoal) gameGoalMesh = mesh;
+                gameScene.add(mesh);
+                gameWorldMeshes.push(mesh);
+                const axes = [];
+                if (Array.isArray(p.x) && p.x.length >= 2) axes.push({ axis: 'x', range: p.x, speed: p.speed || 0.5 });
+                if (Array.isArray(p.y) && p.y.length >= 2) axes.push({ axis: 'y', range: p.y, speed: p.speed || 0.5 });
+                if (Array.isArray(p.z) && p.z.length >= 2) axes.push({ axis: 'z', range: p.z, speed: p.speed || 0.5 });
+                if (axes.length) gameDynamicObjects.push({ mesh, axes, startTime: performance.now() / 1000 });
+            });
+            (mapData.walls || []).forEach(w => {
+                const width = w.width || 10, height = w.height || 3, depth = w.depth || 0.5;
+                const geo = new THREE.BoxGeometry(width, height, depth);
+                const mat = new THREE.MeshStandardMaterial({ color: '#505050', roughness: 0.8, metalness: 0.1 });
+                const mesh = new THREE.Mesh(geo, mat);
+                mesh.position.set(w.x, w.y + height/2, w.z);
+                mesh.receiveShadow = true; mesh.castShadow = true;
+                mesh.userData = { isGround: false };
+                gameScene.add(mesh);
+                gameWallMeshes.push(mesh);
+            });
+            const sp = mapData.startPosition;
+            gameCamera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 300);
+            gameCamera.position.set(sp.x, sp.y, sp.z);
+            gameCamera.rotation.order = 'YXZ';
+            gamePlayer = {
+                camera: gameCamera,
+                position: new THREE.Vector3(sp.x, sp.y, sp.z),
+                velocity: new THREE.Vector3(),
+                yaw: 0, pitch: 0,
+                isGrounded: false,
+                lastGroundMesh: null,
+                lastGroundPos: new THREE.Vector3(),
+                currentGroundMesh: null,
+                startPosition: new THREE.Vector3(sp.x, sp.y, sp.z),
+            };
+            euler.set(0, 0, 0, 'YXZ');
+            gameCamera.quaternion.setFromEuler(euler);
+            Object.keys(keys).forEach(k => keys[k] = false);
+            gameCanvas.requestPointerLock();
+            document.addEventListener('pointerlockchange', onGameLock);
+            document.addEventListener('mousemove', onGameMouse);
+            window.addEventListener('keydown', onKeyRun);
+            window.addEventListener('keyup', onKeyUpRun);
+            window.addEventListener('resize', onGameResize);
+        }
+
+        function exitGameMode() {
+            isGameMode = false;
+            gameOverlay.style.display = 'none';
+            if (document.pointerLockElement === gameCanvas) document.exitPointerLock();
+            document.removeEventListener('pointerlockchange', onGameLock);
+            document.removeEventListener('mousemove', onGameMouse);
+            window.removeEventListener('keydown', onKeyRun);
+            window.removeEventListener('keyup', onKeyUpRun);
+            window.removeEventListener('resize', onGameResize);
+            if (gameRenderer) { gameRenderer.dispose(); gameRenderer = null; }
+            gameScene = null; gameCamera = null; gamePlayer = null;
+            gameWorldMeshes = []; gameWallMeshes = []; gameDynamicObjects = [];
+        }
+        function onGameLock() { pointerLocked = document.pointerLockElement === gameCanvas; }
+        function onGameMouse(e) {
+            if (!pointerLocked || !isGameMode) return;
+            euler.setFromQuaternion(gameCamera.quaternion);
+            euler.y -= e.movementX * MOUSE_SENSITIVITY * 0.01;
+            euler.x -= e.movementY * MOUSE_SENSITIVITY * 0.01;
+            euler.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, euler.x));
+            gameCamera.quaternion.setFromEuler(euler);
+        }
+        function onGameResize() {
+            if (!gameRenderer) return;
+            gameRenderer.setSize(window.innerWidth, window.innerHeight);
+            if (gameCamera) { gameCamera.aspect = window.innerWidth / window.innerHeight; gameCamera.updateProjectionMatrix(); }
+        }
+        function updateGameMode(dt) {
+            if (!isGameMode || !gamePlayer || !gameCamera) return;
+            const p = gamePlayer;
+            const dts = Math.min(dt, 0.1);
+            const forward = new THREE.Vector3(-Math.sin(euler.y), 0, -Math.cos(euler.y)).normalize();
+            const right = new THREE.Vector3(Math.cos(euler.y), 0, -Math.sin(euler.y)).normalize();
+            const moveDir = new THREE.Vector3(0,0,0);
+            const inputX = (keys.a ? -1 : 0) + (keys.d ? 1 : 0);
+            const inputZ = (keys.w ? 1 : 0) + (keys.s ? -1 : 0);
+            moveDir.add(forward.clone().multiplyScalar(inputZ * GAME_SPEED));
+            moveDir.add(right.clone().multiplyScalar(inputX * GAME_SPEED));
+            if (moveDir.length() > GAME_SPEED) moveDir.normalize().multiplyScalar(GAME_SPEED);
+            if (p.isGrounded && p.lastGroundMesh) {
+                const cp = new THREE.Vector3();
+                p.lastGroundMesh.getWorldPosition(cp);
+                p.position.add(cp.clone().sub(p.lastGroundPos));
+                p.lastGroundPos.copy(cp);
+            }
+            if (keys.space && p.isGrounded) {
+                p.velocity.y = GAME_JUMP_FORCE;
+                p.isGrounded = false;
+                p.lastGroundMesh = null;
+                p.currentGroundMesh = null;
+            }
+            if (!p.isGrounded) p.velocity.y -= GAME_GRAVITY * dts;
+            p.position.x += moveDir.x * dts;
+            p.position.z += moveDir.z * dts;
+            p.position.y += p.velocity.y * dts;
+            p.isGrounded = false;
+            p.currentGroundMesh = null;
+            const rayOrigin = p.position.clone(); rayOrigin.y += 0.1;
+            if (gameWorldMeshes.length > 0) {
+                const rc = new THREE.Raycaster(rayOrigin, new THREE.Vector3(0, -1, 0), 0, PLAYER_HEIGHT + 0.3);
+                const hits = rc.intersectObjects(gameWorldMeshes, false);
+                if (hits.length > 0 && hits[0].point && typeof hits[0].point.y === 'number') {
+                    const gy = hits[0].point.y;
+                    if (p.position.y - PLAYER_HEIGHT <= gy + 0.05) {
+                        p.position.y = gy + PLAYER_HEIGHT;
+                        p.velocity.y = 0;
+                        p.isGrounded = true;
+                        const gm = hits[0].object;
+                        if (gm !== p.lastGroundMesh) {
+                            p.lastGroundMesh = gm;
+                            gm.getWorldPosition(p.lastGroundPos);
+                        }
+                        p.currentGroundMesh = gm;
+                    }
+                }
+            }
+            if (p.position.y < -5) {
+                p.position.copy(p.startPosition);
+                p.velocity.set(0,0,0);
+            }
+            const pb = {
+                minX: p.position.x - PLAYER_RADIUS, maxX: p.position.x + PLAYER_RADIUS,
+                minY: p.position.y - PLAYER_HEIGHT, maxY: p.position.y,
+                minZ: p.position.z - PLAYER_RADIUS, maxZ: p.position.z + PLAYER_RADIUS,
+            };
+            for (const mesh of gameWallMeshes) {
+                const box = new THREE.Box3().setFromObject(mesh);
+                const obs = { minX: box.min.x, maxX: box.max.x, minY: box.min.y, maxY: box.max.y, minZ: box.min.z, maxZ: box.max.z };
+                const ox = Math.min(pb.maxX, obs.maxX) - Math.max(pb.minX, obs.minX);
+                const oy = Math.min(pb.maxY, obs.maxY) - Math.max(pb.minY, obs.minY);
+                const oz = Math.min(pb.maxZ, obs.maxZ) - Math.max(pb.minZ, obs.minZ);
+                if (ox > 0 && oy > 0 && oz > 0) {
+                    if (ox <= oy && ox <= oz) p.position.x += (p.position.x > (obs.minX+obs.maxX)/2 ? 1 : -1) * ox;
+                    else if (oy <= ox && oy <= oz) p.position.y += (p.position.y > (obs.minY+obs.maxY)/2 ? 1 : -1) * oy;
+                    else p.position.z += (p.position.z > (obs.minZ+obs.maxZ)/2 ? 1 : -1) * oz;
+                }
+            }
+            const now = performance.now() / 1000;
+            for (const dyn of gameDynamicObjects) {
+                const elapsed = now - dyn.startTime;
+                for (const a of dyn.axes) {
+                    const t = Math.sin(elapsed * a.speed * 2 * Math.PI) * 0.5 + 0.5;
+                    const v = a.range[0] + (a.range[1] - a.range[0]) * t;
+                    if (a.axis === 'x') dyn.mesh.position.x = v;
+                    else if (a.axis === 'y') dyn.mesh.position.y = v;
+                    else dyn.mesh.position.z = v;
+                }
+            }
+            if (gameGoalMesh && p.currentGroundMesh === gameGoalMesh) {
+                gameGoalTimer += dts;
+                if (gameGoalTimer >= 0.8) {
+                    exitGameMode();
+                    alert('测试通关！');
+                }
+            } else {
+                gameGoalTimer = 0;
+            }
+            gameCamera.position.copy(p.position);
+            gameCamera.quaternion.setFromEuler(euler);
+            gameRenderer.render(gameScene, gameCamera);
+        }
+
+        // ===================== 编辑模式射线 =====================
+        const raycaster = new THREE.Raycaster(), mouse = new THREE.Vector2();
+        renderer.domElement.addEventListener('click', e => {
+            if (isRunMode || isGameMode) return;
+            const rect = renderer.domElement.getBoundingClientRect();
+            mouse.x = ((e.clientX-rect.left)/rect.width)*2-1;
+            mouse.y = -((e.clientY-rect.top)/rect.height)*2+1;
+            raycaster.setFromCamera(mouse, editorCamera);
+            const hits = raycaster.intersectObjects(sceneObjects.map(o=>o.mesh));
+            if (hits.length) { const obj = sceneObjects.find(o=>o.mesh===hits[0].object); if(obj) selectObject(obj); }
+            else selectObject(null);
+        });
+
+        // ===================== 事件绑定 =====================
+        document.getElementById('add-btn').addEventListener('click', () => showContextMenu(60,80,[
+            { label:'新建地图', action:createNewMap }, { label:'上传地图', action:uploadMap }
+        ]));
+        document.getElementById('create-platform').addEventListener('click', () => createNewControl('platform'));
+        document.getElementById('create-wall').addEventListener('click', () => createNewControl('wall'));
+        ['prop-length','prop-width','prop-height','prop-posx','prop-posy','prop-posz','prop-movemin','prop-movemax','prop-speed','prop-tooltip','prop-tooltip-en']
+            .forEach(id => document.getElementById(id).addEventListener('change', applyPropertyChange));
+        document.getElementById('prop-isgoal').addEventListener('change', applyPropertyChange);
+        document.getElementById('prop-ismoving').addEventListener('change', function() {
+            document.getElementById('moving-params').style.display = this.checked ? 'block' : 'none';
+            applyPropertyChange();
+        });
+        document.getElementById('prop-moveaxis').addEventListener('change', applyPropertyChange);
+        document.getElementById('delete-btn').addEventListener('click', () => {
+            if (!selectedObject || !mapData) return;
+            deleteControlById(selectedObject.data.id, selectedObject.type);
+        });
+        window.addEventListener('keydown', e => { if (e.ctrlKey && e.key === 's') { e.preventDefault(); downloadMap(); } });
+        document.getElementById('statusbar').addEventListener('dblclick', downloadMap);
+        document.getElementById('statusbar').title = '双击保存 / Ctrl+S 下载JSON';
+        window.addEventListener('beforeunload', e => { if (mapData) { saveCurrentMap(); e.preventDefault(); e.returnValue = ''; } });
+        window.addEventListener('resize', () => {
+            const w = container.clientWidth, h = container.clientHeight;
+            renderer.setSize(w, h);
+            editorCamera.aspect = w/h; editorCamera.updateProjectionMatrix();
+            if (runCamera) { runCamera.aspect = w/h; runCamera.updateProjectionMatrix(); }
+        });
+
+        // ===================== 动画循环 =====================
+        function animate() {
+            animationId = requestAnimationFrame(animate);
+            const now = performance.now() / 1000;
+            const dt = clock.getDelta();
+            if (isGameMode) {
+                updateGameMode(dt);
+                updateDynamicObjects(now);
+            } else {
+                updateDynamicObjects(now);
+                if (isRunMode && runCamera) {
+                    updateRunMovement(dt);
+                    renderer.render(scene, runCamera);
+                } else {
+                    renderer.render(scene, editorCamera);
+                }
+            }
+        }
+
+        // ===================== 启动 =====================
+        const maps = loadMapList(); renderMapList();
+        if (maps.length) switchMap(maps[0].name);
+        else createNewMap();
+        updateStatusbar(); animate();
+    </script>
+</body>
+</html>
