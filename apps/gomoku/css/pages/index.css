@@ -1,0 +1,4 @@
+.index-page { min-height: 100vh; display: flex; flex-direction: column; justify-content: center; }
+.index-page h1 { text-align: center; margin-bottom: 32px; color: var(--md-primary); font-size: 3rem; font-weight: 400; }
+.cards-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 24px; padding: 16px 0; }
+@media (min-width: 1024px) { .cards-grid { grid-template-columns: repeat(5, 1fr); } }
