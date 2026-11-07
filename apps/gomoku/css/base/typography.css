@@ -1,0 +1,16 @@
+:root {
+    --md-font-family: 'Roboto', 'Noto Sans', system-ui, -apple-system, 'Helvetica Neue', sans-serif;
+    --md-headline-font: 'Google Sans', var(--md-font-family);
+}
+body { font-family: var(--md-font-family); }
+.md2-headline1 { font-size: 6rem; font-weight: 300; letter-spacing: -1.5px; }
+.md2-headline2 { font-size: 3.75rem; font-weight: 300; letter-spacing: -0.5px; }
+.md2-headline3 { font-size: 3rem; font-weight: 400; }
+.md2-headlinesong { font-size: 2rem; font-weight: 400; }
+.md2-headline4 { font-size: 2.125rem; font-weight: 400; letter-spacing: 0.25px; }
+.md2-headline5 { font-size: 1.5rem; font-weight: 400; }
+.md2-headline6 { font-size: 1.25rem; font-weight: 500; letter-spacing: 0.15px; }
+.md2-body1 { font-size: 1rem; font-weight: 400; letter-spacing: 0.5px; }
+.md2-body2 { font-size: 0.875rem; font-weight: 400; letter-spacing: 0.25px; }
+.md2-button-text { font-size: 0.875rem; font-weight: 500; letter-spacing: 1.25px; text-transform: uppercase; }
+.md2-caption { font-size: 0.75rem; font-weight: 400; letter-spacing: 0.4px; }
