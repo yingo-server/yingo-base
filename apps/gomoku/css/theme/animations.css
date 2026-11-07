@@ -1,0 +1,15 @@
+.fade-enter { opacity: 0; }
+.fade-enter-active { opacity: 1; transition: opacity 0.3s ease; }
+.fade-exit { opacity: 1; }
+.fade-exit-active { opacity: 0; transition: opacity 0.3s ease; }
+.ripple { position: relative; overflow: hidden; }
+.ripple::after {
+    content: ""; display: block; position: absolute; width: 100%; height: 100%; top: 0; left: 0;
+    background: radial-gradient(circle, rgba(255,255,255,0.4) 10%, transparent 20%);
+    background-size: 200% 200%; background-position: center; opacity: 0; transition: opacity 0.2s;
+}
+.ripple:active::after { opacity: 0.3; }
+.card-hover { transition: box-shadow 0.2s ease, transform 0.2s ease; }
+.card-hover:hover { box-shadow: var(--md-shadow-3); transform: translateY(-2px); }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.animate-spin { animation: spin 1s linear infinite; }
