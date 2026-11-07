@@ -1,7 +1,7 @@
 {
   "id": "example-clock-widget",
   "name": "示例组件",
-  "icon": "🕒",
+  "icon": "lawnicons:generic_clock",
   "type": "grid",
   "entry": "apps/example-clock-widget/index.html"
 }

@@ -3,12 +3,12 @@ version: 1
 apps:
   - id: 'example-clock-widget'
     name: '示例组件'
-    icon: '🕒'
+    icon: 'lawnicons:generic_clock'
     type: 'grid'
     entry: 'apps/example-clock-widget/index.html'
   - id: 'translator'
     name: '翻译'
-    icon: '🌐'
+    icon: 'lawnicons:translate_you'
     type: 'dock'
     entry: 'apps/translator/index.html'
 music:

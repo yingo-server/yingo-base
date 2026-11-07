@@ -1,7 +1,7 @@
 {
   "id": "translator",
   "name": "翻译",
-  "icon": "🌐",
+  "icon": "lawnicons:translate_you",
   "type": "dock",
   "entry": "apps/translator/index.html"
 }
