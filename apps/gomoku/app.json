@@ -1,0 +1,7 @@
+{
+  "id": "gomoku",
+  "name": "五子棋 · 弈事",
+  "icon": "⚫",
+  "type": "grid",
+  "entry": "apps/gomoku/index.html"
+}
