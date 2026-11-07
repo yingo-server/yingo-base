@@ -1,6 +1,6 @@
 // Generate yingotab.yml from apps/*/app.json and music/ directory.
 // Node 22 native ESM, zero dependencies.
-import { readdirSync, readFileSync, existsSync } from 'node:fs';
+import { readdirSync, readFileSync, existsSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
