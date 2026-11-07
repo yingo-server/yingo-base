@@ -1,0 +1,16 @@
+.md2-card {
+    background-color: var(--md-surface); border-radius: var(--md-radius-medium);
+    box-shadow: var(--md-shadow-1); padding: 24px 16px;
+    transition: box-shadow 0.2s, transform 0.2s;
+    display: flex; flex-direction: column; align-items: center; text-align: center;
+}
+.md2-card.interactive { cursor: pointer; }
+.md2-card.interactive:hover { box-shadow: var(--md-shadow-3); transform: translateY(-2px); }
+.md2-card.disabled { opacity: 0.6; filter: grayscale(1); pointer-events: none; }
+.card-icon { font-size: 48px; margin-bottom: 16px; color: var(--md-primary); }
+.status-badge {
+    margin-top: 12px; padding: 4px 12px; border-radius: 16px;
+    background-color: var(--md-primary); color: var(--md-on-primary);
+    font-size: 0.75rem; font-weight: 500; text-transform: uppercase;
+}
+.status-badge.active { background-color: #4caf50; }
