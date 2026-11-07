@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="color-scheme" content="dark">
+    <meta name="theme-color" content="#000000">
+    <title>逝者如斯 · 倒计时</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="splash" id="splash">
+    <div class="splash__particles">
+        <span style="--t:8s;--x:12%;--y:18%;--s:1px"></span>
+        <span style="--t:12s;--x:78%;--y:22%;--s:2px"></span>
+        <span style="--t:10s;--x:35%;--y:75%;--s:1px"></span>
+        <span style="--t:14s;--x:62%;--y:68%;--s:1.5px"></span>
+        <span style="--t:9s;--x:88%;--y:55%;--s:1px"></span>
+        <span style="--t:11s;--x:22%;--y:42%;--s:2px"></span>
+        <span style="--t:13s;--x:55%;--y:12%;--s:1px"></span>
+        <span style="--t:15s;--x:45%;--y:85%;--s:1.5px"></span>
+    </div>
+    <div class="splash__vignette"></div>
+    <div class="splash__screen splash__screen--brand" data-screen="brand">
+        <div class="splash__brand">
+            <span class="splash__letter" style="animation-delay: 0s">Y</span>
+            <span class="splash__letter" style="animation-delay: 0.1s">I</span>
+            <span class="splash__letter" style="animation-delay: 0.18s">N</span>
+            <span class="splash__letter" style="animation-delay: 0.28s">G</span>
+            <span class="splash__letter" style="animation-delay: 0.38s">O</span>
+        </div>
+    </div>
+    <div class="splash__screen splash__screen--logo" data-screen="logo">
+        <svg class="splash__logo-svg" viewBox="0 0 200 200">
+            <circle class="splash__logo-ring" cx="100" cy="100" r="85"/>
+            <line class="splash__logo-tick" x1="100" y1="17" x2="100" y2="27"/>
+            <line class="splash__logo-tick" x1="100" y1="173" x2="100" y2="183"/>
+            <line class="splash__logo-tick" x1="17" y1="100" x2="27" y2="100"/>
+            <line class="splash__logo-tick" x1="173" y1="100" x2="183" y2="100"/>
+            <line class="splash__logo-hand splash__logo-hand--hour" x1="100" y1="100" x2="100" y2="50"/>
+            <line class="splash__logo-hand splash__logo-hand--minute" x1="100" y1="100" x2="132" y2="80"/>
+            <circle class="splash__logo-dot" cx="100" cy="100" r="6"/>
+        </svg>
+        <p class="splash__title">逝者如斯夫</p>
+        <p class="splash__subtitle">时间的重量，生命的刻度</p>
+    </div>
+    <div class="splash__screen splash__screen--tutorial" data-screen="tutorial">
+        <div class="tutorial__layout">
+            <div class="tutorial__lines">
+                <div class="tutorial__line tut-line--h-left"></div>
+                <div class="tutorial__line tut-line--h-right"></div>
+                <div class="tutorial__line tut-line--v-top"></div>
+                <div class="tutorial__line tut-line--v-bottom"></div>
+            </div>
+            <div class="tutorial__zone tut-zone--1"><span>设置</span></div>
+            <div class="tutorial__zone tut-zone--2"><span>快速调节</span></div>
+            <div class="tutorial__zone tut-zone--3"><span>配置倒计时</span></div>
+            <div class="tutorial__zone tut-zone--4"><span>暂停/停止</span></div>
+        </div>
+        <div class="tutorial__textbox">
+            <div class="tutorial__label"></div>
+            <div class="tutorial__typer"></div>
+        </div>
+        <div class="tutorial__hint">点击屏幕继续</div>
+        <button class="splash__done">开始使用</button>
+    </div>
+</div>
+
+<video class="bg-video" muted playsinline loop></video>
+<img class="bg-img" id="bgImg" style="display:none">
+
+<div class="flash-overlay"></div>
+
+<div class="zone zone--top-left" data-zone="1"></div>
+<div class="zone zone--top-right" data-zone="2"></div>
+<div class="zone zone--bottom-left" data-zone="3"></div>
+<div class="zone zone--bottom-right" data-zone="4"></div>
+
+<main class="clock" id="clock">
+    <div class="clock__date" id="dateDisplay"></div>
+    <div class="clock__time" id="timeDisplay"><span class="digit"></span><span class="digit"></span><span class="sep">:</span><span class="digit"></span><span class="digit"></span><span class="sep">:</span><span class="digit"></span><span class="digit"></span></div>
+    <div class="clock__week" id="weekDisplay"></div>
+</main>
+
+<div class="wizard" id="wizard">
+    <div class="wizard__backdrop"></div>
+    <div class="wizard__window">
+        <header class="wizard__header">
+            <div class="wizard__stepper"></div>
+            <h2 class="wizard__title">开始倒计时</h2>
+        </header>
+        <div class="wizard__body">
+            <section class="wizard__panel is-active" data-panel="start-select">
+                <div class="wizard__panel-label">选择开始方式</div>
+                <div class="option-card" data-option="1">
+                    <div class="option-card__indicator"></div>
+                    <div class="option-card__body">
+                        <div class="option-card__title">即时开始</div>
+                        <div class="option-card__desc">设置时长后立即启动倒计时</div>
+                    </div>
+                </div>
+                <div class="option-card" data-option="2">
+                    <div class="option-card__indicator"></div>
+                    <div class="option-card__body">
+                        <div class="option-card__title">延时启动</div>
+                        <div class="option-card__desc">设置时长并延时一段时间后启动</div>
+                    </div>
+                </div>
+                <div class="option-card" data-option="3">
+                    <div class="option-card__indicator"></div>
+                    <div class="option-card__body">
+                        <div class="option-card__title">定时启动</div>
+                        <div class="option-card__desc">设置时长并到指定时间点启动</div>
+                    </div>
+                </div>
+            </section>
+            <section class="wizard__panel" data-panel="duration">
+                <div class="wizard__panel-label">倒计时时长</div>
+                <div class="time-input-group">
+                    <div class="input-unit">
+                        <label>时</label>
+                        <input type="number" min="0" max="99" value="0">
+                    </div>
+                    <div class="input-unit">
+                        <label>分</label>
+                        <input type="number" min="0" max="59" value="0">
+                    </div>
+                    <div class="input-unit">
+                        <label>秒</label>
+                        <input type="number" min="0" max="59" value="0">
+                    </div>
+                </div>
+            </section>
+            <section class="wizard__panel" data-panel="delay">
+                <div class="wizard__panel-label">延时时长</div>
+                <div class="time-input-group">
+                    <div class="input-unit">
+                        <label>时</label>
+                        <input type="number" min="0" max="99" value="0">
+                    </div>
+                    <div class="input-unit">
+                        <label>分</label>
+                        <input type="number" min="0" max="59" value="0">
+                    </div>
+                    <div class="input-unit">
+                        <label>秒</label>
+                        <input type="number" min="0" max="59" value="0">
+                    </div>
+                </div>
+            </section>
+            <section class="wizard__panel" data-panel="schedule">
+                <div class="wizard__panel-label">启动时间</div>
+                <div class="time-input-group">
+                    <div class="input-unit">
+                        <label>时</label>
+                        <input type="number" min="0" max="23" value="0">
+                    </div>
+                    <div class="input-unit">
+                        <label>分</label>
+                        <input type="number" min="0" max="59" value="0">
+                    </div>
+                </div>
+            </section>
+            <section class="wizard__panel" data-panel="end-select">
+                <div class="wizard__panel-label">选择结束方式</div>
+                <div class="option-card" data-option="1">
+                    <div class="option-card__indicator"></div>
+                    <div class="option-card__body">
+                        <div class="option-card__title">折跃</div>
+                        <div class="option-card__desc">按进度反色闪烁提醒，逐级强化</div>
+                    </div>
+                </div>
+                <div class="option-card" data-option="2">
+                    <div class="option-card__indicator"></div>
+                    <div class="option-card__body">
+                        <div class="option-card__title">静默</div>
+                        <div class="option-card__desc">仅在结束时反色一次，持续10秒</div>
+                    </div>
+                </div>
+                <div class="option-card" data-option="3">
+                    <div class="option-card__indicator"></div>
+                    <div class="option-card__body">
+                        <div class="option-card__title">心向自由</div>
+                        <div class="option-card__desc">自定义方式结束，可跳转链接</div>
+                    </div>
+                </div>
+            </section>
+            <section class="wizard__panel" data-panel="link">
+                <div class="wizard__panel-label">跳转链接</div>
+                <input type="url" class="link-input" placeholder="https://..." value="">
+            </section>
+            <section class="wizard__panel" data-panel="summary">
+                <div class="wizard__panel-label">配置小结</div>
+                <div class="summary__box">
+                    <div class="summary__text"></div>
+                </div>
+            </section>
+        </div>
+        <footer class="wizard__footer">
+            <button class="wizard__btn wizard__btn--cancel">取消</button>
+            <div class="wizard__footer-right">
+                <button class="wizard__btn wizard__btn--back is-hidden">上一步</button>
+                <button class="wizard__btn wizard__btn--next wizard__btn--primary">下一步</button>
+            </div>
+        </footer>
+    </div>
+</div>
+
+<div class="settings" id="settings">
+    <div class="settings__backdrop"></div>
+    <div class="settings__window">
+        <header class="settings__header">
+            <h2 class="settings__title">设置</h2>
+            <button class="settings__close"></button>
+        </header>
+        <div class="settings__body">
+            <nav class="settings__tabs">
+                <button class="settings__tab is-active" data-tab="clock">时钟</button>
+                <button class="settings__tab" data-tab="timer">计时</button>
+                <button class="settings__tab" data-tab="music">音乐</button>
+                <button class="settings__tab" data-tab="about">关于</button>
+                <button class="settings__tab" data-tab="dev" id="devTab" style="display:none">开发</button>
+            </nav>
+            <div class="settings__panels">
+                <div class="settings__panel is-active" data-panel="clock">
+                    <div class="settings__section">
+                        <label class="settings__toggle" data-key="bg_enabled">
+                            <span class="settings__toggle-label">显示背景</span>
+                            <span class="settings__toggle-track"></span>
+                        </label>
+                    </div>
+                    <div class="settings__section">
+                        <p class="settings__section-label">选择壁纸</p>
+                        <div class="settings__wallpapers"></div>
+                    </div>
+                    <div class="settings__advanced">
+                        <button class="settings__adv-toggle">高级选项</button>
+                        <div class="settings__adv-body">
+                            <div class="settings__section">
+                                <p class="settings__section-label">在线链接</p>
+                                <input type="url" class="settings__url-input" placeholder="https://...mp4 或 .jpg (需服务器允许 CORS)">
+                                <button class="settings__url-btn">添加链接</button>
+                                <p class="settings__note">若链接无法加载，请先下载文件再通过下方上传</p>
+                            </div>
+                            <div class="settings__section">
+                                <p class="settings__section-label">上传文件</p>
+                                <label class="settings__upload-btn">选择视频或图片<input type="file" accept="video/*,image/*" hidden></label>
+                            </div>
+                            <div class="settings__section">
+                                <p class="settings__section-label">已添加的自定义壁纸</p>
+                                <div class="settings__custom-list"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="settings__panel" data-panel="timer">
+                    <div class="settings__section">
+                        <label class="settings__toggle" data-key="timer_showtime">
+                            <span class="settings__toggle-label">暂停时显示真实剩余时间</span>
+                            <span class="settings__toggle-track"></span>
+                        </label>
+                        <p class="settings__note">开启后，从下下次启动的倒计时开始，暂停弹窗会显示真实剩余时间而非 *** 。已运行的倒计时不受影响。设计为延迟生效，避免临时偷懒。</p>
+                    </div>
+                </div>
+                <div class="settings__panel" data-panel="music">
+                    <div class="settings__section">
+                        <label class="settings__toggle" data-key="music_enabled">
+                            <span class="settings__toggle-label">播放音乐</span>
+                            <span class="settings__toggle-track"></span>
+                        </label>
+                    </div>
+                    <div class="settings__section">
+                        <label class="settings__toggle" data-key="music_loop">
+                            <span class="settings__toggle-label">单曲循环</span>
+                            <span class="settings__toggle-track"></span>
+                        </label>
+                    </div>
+                    <div class="settings__section">
+                        <div class="music__player">
+                            <button class="music__playpause"></button>
+                            <span class="music__trackname">未选择</span>
+                        </div>
+                        <div class="music__playlist"></div>
+                    </div>
+                    <div class="settings__advanced">
+                        <button class="settings__adv-toggle">高级选项</button>
+                        <div class="settings__adv-body">
+                            <div class="settings__section">
+                                <p class="settings__section-label">在线链接</p>
+                                <input type="url" class="settings__url-input music__url-input" placeholder="https://...mp3 或 .flac (需 CORS)">
+                                <button class="settings__url-btn music__url-btn">添加链接</button>
+                                <p class="settings__note">若链接无法加载，请先下载再上传</p>
+                            </div>
+                            <div class="settings__section">
+                                <p class="settings__section-label">上传音频</p>
+                                <label class="settings__upload-btn">选择音频文件<input type="file" accept="audio/*" hidden></label>
+                            </div>
+                            <div class="settings__section">
+                                <p class="settings__section-label">已添加的自定义音频</p>
+                                <div class="settings__custom-list music__custom"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="settings__panel" data-panel="about">
+                    <div class="about__hero">
+                        <p class="about__name">MineClock</p>
+                        <p class="about__ver" id="aboutVer">版本 3.1  ·  内部版本 3.10.76612267</p>
+                    </div>
+                    <div class="settings__advanced">
+                        <button class="settings__adv-toggle">作者</button>
+                        <div class="settings__adv-body">
+                            <div class="about__info">
+                                <p>GitHub <span>yingo-server</span></p>
+                                <p>博客 <span>blog.344977.xyz</span></p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="settings__advanced">
+                        <button class="settings__adv-toggle">浏览器信息</button>
+                        <div class="settings__adv-body">
+                            <div class="about__info" id="aboutBrowser"></div>
+                        </div>
+                    </div>
+                    <div class="settings__advanced">
+                        <button class="settings__adv-toggle">许可证</button>
+                        <div class="settings__adv-body">
+                            <div class="about__license">
+                                <p class="about__license-title">MineClock</p>
+                                <p class="about__license-note">GNU Affero General Public License v3.0</p>
+                            </div>
+                            <div class="about__license-list">
+                                <p>San Francisco Display<span>Apple Inc. — SIL Open Font License 1.1</span></p>
+                                <p>Web Audio API<span>W3C — 内置于浏览器</span></p>
+                                <p>IndexedDB<span>W3C — 内置于浏览器</span></p>
+                                <p>CSS Backdrop Filter<span>W3C — 内置于浏览器</span></p>
+                                <p>背景视频素材<span>用户自行提供，版权归属原作者</span></p>
+                                <p>音频素材<span>HOYO-MiX — 版权归属 miHoYo</span></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="settings__panel" data-panel="dev">
+                    <div class="settings__advanced is-open">
+                        <button class="settings__adv-toggle">样式</button>
+                        <div class="settings__adv-body" style="max-height:none">
+                            <div class="settings__section">
+                                <p class="settings__section-label">示例模板</p>
+                                <a class="settings__url-btn" href="css/style.css" target="_blank" style="display:inline-block;text-decoration:none">查看完整样式文件</a>
+                            </div>
+                            <div class="settings__section">
+                                <p class="settings__section-label">上传自定义 CSS</p>
+                                <label class="settings__upload-btn">选择 CSS 文件<input type="file" accept=".css" hidden id="devCssFile"></label>
+                            </div>
+                            <div class="settings__section">
+                                <p class="settings__section-label">自定义 CSS 预览</p>
+                                <textarea class="dev__code" id="devCssPreview" readonly rows="12" style="font-size:0.68rem;line-height:1.6"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="settings__advanced">
+                        <button class="settings__adv-toggle">逻辑</button>
+                        <div class="settings__adv-body">
+                            <div class="settings__section">
+                                <p class="settings__section-label">自定义头部脚本</p>
+                                <textarea class="dev__code" id="devHeadCode" placeholder="// 在页面加载前执行的代码" rows="6"></textarea>
+                            </div>
+                            <div class="settings__section">
+                                <p class="settings__section-label">自定义内容脚本</p>
+                                <textarea class="dev__code" id="devBodyCode" placeholder="// 在页面加载后执行的代码" rows="8"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="js/splash/splash.js"></script>
+<script src="js/clock/clock.js"></script>
+<script src="js/runtime/runtime.js"></script>
+<script src="js/setup/setup.js"></script>
+<script src="js/quickadj/quickadj.js"></script>
+<script src="js/settings/settings.js"></script>
+<script>document.addEventListener('DOMContentLoaded',function(){if(CM.settings&&CM.settings.applyBG)CM.settings.applyBG();})</script>
+<div class="bg-loader" id="bgLoader"><div class="bg-loader__bar"></div></div>
+</body>
+</html>
