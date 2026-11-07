@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.5, user-scalable=yes">
+    <title>本地双人对战 · 五子棋</title>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link rel="stylesheet" href="../css/base/reset.css">
+    <link rel="stylesheet" href="../css/base/typography.css">
+    <link rel="stylesheet" href="../css/theme/material-colors.css">
+    <link rel="stylesheet" href="../css/theme/animations.css">
+    <link rel="stylesheet" href="../css/layout/container.css">
+    <link rel="stylesheet" href="../css/components/buttons.css">
+    <link rel="stylesheet" href="../css/components/board.css">
+    <link rel="stylesheet" href="../css/components/toast.css">
+    <link rel="stylesheet" href="../css/pages/local-2p.css">
+</head>
+<body class="md2-theme local-2p-page">
+    <div class="container game-page">
+        <header class="game-header">
+            <a href="../index.html" class="md2-icon-button">
+                <span class="material-icons">arrow_back</span>
+            </a>
+            <h2 class="md2-title">本地双人对战</h2>
+            <button class="md2-button" id="resetBtn">重新开始</button>
+        </header>
+        <main class="game-main">
+            <div class="board-wrapper">
+                <canvas id="board" width="600" height="600" class="board-canvas"></canvas>
+            </div>
+        </main>
+        <footer class="game-footer">
+            <span class="md2-caption">点击棋盘落子 · 黑先白后</span>
+        </footer>
+    </div>
+
+    <!-- Toast 容器 -->
+    <div id="toast-container" class="md2-toast-container"></div>
+
+    <script type="module">
+        import Game from '../js/core/game.js';
+        const canvas = document.getElementById('board');
+        const resetBtn = document.getElementById('resetBtn');
+        // 不再传入 turnIndicator
+        new Game(canvas, resetBtn);
+    </script>
+</body>
+</html>
