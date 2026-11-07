@@ -1,0 +1,1547 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#6750A4">
+<title>佚名 · 昵称特效</title>
+
+<!-- 拦截鼠标/键盘 -->
+<script>
+(function interceptInput() {
+  document.addEventListener('mousedown', function(e) {
+    if (e.button !== 0) { e.preventDefault(); e.stopPropagation(); return false; }
+  }, true);
+  document.addEventListener('contextmenu', function(e) {
+    e.preventDefault(); e.stopPropagation(); return false;
+  }, true);
+  document.addEventListener('auxclick', function(e) {
+    if (e.button !== 0) { e.preventDefault(); e.stopPropagation(); return false; }
+  }, true);
+  document.addEventListener('dragstart', function(e) {
+    const tag = e.target.tagName;
+    if (tag !== 'INPUT' && tag !== 'TEXTAREA') { e.preventDefault(); return false; }
+  }, true);
+  document.addEventListener('keydown', function(e) {
+    const key = e.key;
+    const ctrl = e.ctrlKey || e.metaKey;
+    const shift = e.shiftKey;
+    if (key === 'F11' || key === 'F12') { e.preventDefault(); e.stopPropagation(); return false; }
+    if (ctrl && shift && /^[ijc]$/i.test(key)) { e.preventDefault(); e.stopPropagation(); return false; }
+    if (ctrl && !shift && /^[usp]$/i.test(key)) { e.preventDefault(); e.stopPropagation(); return false; }
+  }, true);
+})();
+</script>
+
+<!-- Debug 参数 -->
+<script>
+(function parseDebugParam() {
+  try {
+    const p = new URLSearchParams(location.search).get('debug');
+    if (p === 'true' || p === '1') window.__DEBUG_FORCE__ = 'high';
+    else if (p === 'false' || p === '0') window.__DEBUG_FORCE__ = 'low';
+    else window.__DEBUG_FORCE__ = null;
+  } catch (e) { window.__DEBUG_FORCE__ = null; }
+})();
+</script>
+
+<!-- CDN -->
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  if (typeof tailwind === 'undefined') {
+    document.write('<script src="https://unpkg.com/tailwindcss@3.4.1/lib/index.js"><\/script>');
+  }
+</script>
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script>
+  if (typeof Vue === 'undefined') {
+    document.write('<script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.prod.js"><\/script>');
+  }
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script>
+  if (typeof gsap === 'undefined') {
+    document.write('<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"><\/script>');
+  }
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/CustomEase.min.js"></script>
+<script>
+  if (typeof CustomEase === 'undefined') {
+    document.write('<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/CustomEase.min.js"><\/script>');
+  }
+</script>
+
+<!-- 性能检测 -->
+<script>
+(function quickPerfDetect() {
+  try {
+    if (window.__DEBUG_FORCE__ === 'high') {
+      window.__PERF_SCORE__ = 100; window.__PERF_LOW__ = false;
+      document.documentElement.setAttribute('data-perf', 'high'); return;
+    }
+    if (window.__DEBUG_FORCE__ === 'low') {
+      window.__PERF_SCORE__ = 0; window.__PERF_LOW__ = true;
+      document.documentElement.setAttribute('data-perf', 'low'); return;
+    }
+    let x = 1, intOps = 0;
+    let tStart = performance.now();
+    while (performance.now() - tStart < 50) {
+      for (let i = 0; i < 50000; i++) {
+        x = (x * 31 + 17) | 0; x ^= x >>> 13; x = (x * 5 + 3) | 0;
+      }
+      intOps += 50000;
+    }
+    const intRate = (intOps / (performance.now() - tStart)) * 1000 / 1e6;
+    const container = document.createElement('div');
+    container.style.cssText = 'position:absolute;left:-9999px;top:0;visibility:hidden;';
+    (document.body || document.documentElement).appendChild(container);
+    tStart = performance.now();
+    let domOps = 0;
+    while (performance.now() - tStart < 50) {
+      for (let i = 0; i < 50; i++) {
+        const el = document.createElement('div'); el.textContent = 'x'; container.appendChild(el);
+      }
+      void container.offsetHeight; container.innerHTML = ''; domOps += 50;
+    }
+    if (container.parentNode) container.parentNode.removeChild(container);
+    const domRate = (domOps / (performance.now() - tStart)) * 1000 / 1000;
+    const canvas = document.createElement('canvas');
+    canvas.width = 300; canvas.height = 200;
+    const ctx = canvas.getContext('2d');
+    let frames = 0;
+    tStart = performance.now();
+    while (performance.now() - tStart < 50) {
+      ctx.clearRect(0, 0, 300, 200);
+      for (let i = 0; i < 150; i++) {
+        ctx.fillStyle = `hsl(${i % 360},70%,50%)`;
+        ctx.beginPath();
+        ctx.arc((i * 37) % 300, (i * 53) % 200, (i % 20) + 5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      frames++;
+    }
+    const canvasFps = (frames / (performance.now() - tStart)) * 1000;
+    const intScore = Math.min(150, (intRate / 80) * 50);
+    const domScore = Math.min(150, (domRate / 40) * 50);
+    const canvasScore = Math.min(150, (canvasFps / 400) * 50);
+    const total = Math.round((intScore + domScore + canvasScore) / 3);
+    window.__PERF_SCORE__ = total;
+    window.__PERF_LOW__ = total < 40;
+    document.documentElement.setAttribute('data-perf', total < 40 ? 'low' : 'high');
+  } catch (e) {
+    window.__PERF_SCORE__ = 100; window.__PERF_LOW__ = false;
+    document.documentElement.setAttribute('data-perf', 'high');
+  }
+})();
+</script>
+
+<script>
+tailwind.config = {
+  theme: { extend: {
+    colors: {
+      'md-primary': '#6750A4', 'md-on-primary': '#FFFFFF',
+      'md-primary-container': '#EADDFF', 'md-on-primary-container': '#21005D',
+      'md-error': '#B3261E', 'md-error-container': '#F9DEDC',
+      'md-outline': '#79747E', 'md-outline-variant': '#CAC4D0',
+    },
+    fontFamily: {
+      sans: ['"Google Sans"', '"Roboto"', '-apple-system', 'BlinkMacSystemFont', 'system-ui', 'sans-serif'],
+      mono: ['"Roboto Mono"', 'Consolas', 'monospace'],
+    },
+  }}
+}
+</script>
+
+<style>
+  [v-cloak] { display: none !important; }
+  * { -webkit-tap-highlight-color: transparent; }
+  html, body {
+    height: 100%; margin: 0; overflow: hidden;
+    -webkit-user-select: none; -moz-user-select: none; user-select: none;
+  }
+  input, textarea, [contenteditable] {
+    -webkit-user-select: text; -moz-user-select: text; user-select: text;
+  }
+  body {
+    font-family: "Google Sans", "Roboto", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    background: #FEF7FF; color: #1D1B20;
+    -webkit-font-smoothing: antialiased; cursor: default;
+  }
+  #app { height: 100%; }
+
+  /* 背景 + 径向遮罩 */
+  #bg-layer {
+    position: fixed; inset: 0; z-index: -10;
+    overflow: hidden; background-color: #1a1a2e;
+  }
+  #bg-img {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    object-fit: cover; object-position: center;
+    display: block; opacity: 0;
+    transition: opacity 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+    pointer-events: none;
+  }
+  #bg-img.loaded { opacity: 1; }
+  #bg-layer .bg-mask {
+    position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(
+      ellipse 85% 75% at 50% 48%,
+      rgba(254, 247, 255, 0.92) 0%,
+      rgba(254, 247, 255, 0.88) 50%,
+      rgba(254, 247, 255, 0.55) 70%,
+      rgba(254, 247, 255, 0.18) 87%,
+      rgba(254, 247, 255, 0) 100%
+    );
+  }
+  @media (min-width: 768px) {
+    #bg-layer .bg-mask {
+      background: radial-gradient(
+        ellipse 760px 520px at 50% 50%,
+        rgba(254, 247, 255, 0.94) 0%,
+        rgba(254, 247, 255, 0.90) 52%,
+        rgba(254, 247, 255, 0.58) 72%,
+        rgba(254, 247, 255, 0.20) 88%,
+        rgba(254, 247, 255, 0) 100%
+      );
+    }
+  }
+
+  /* Material 3 排版 */
+  .md-title-large { font-size: 22px; line-height: 28px; font-weight: 400; }
+  .md-title-medium { font-size: 16px; line-height: 24px; font-weight: 500; letter-spacing: 0.15px; }
+  .md-title-small { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: 0.1px; }
+  .md-body-large { font-size: 16px; line-height: 24px; font-weight: 400; letter-spacing: 0.5px; }
+  .md-body-medium { font-size: 14px; line-height: 20px; font-weight: 400; letter-spacing: 0.25px; }
+  .md-body-small { font-size: 12px; line-height: 16px; font-weight: 400; letter-spacing: 0.4px; }
+  .md-label-medium { font-size: 12px; line-height: 16px; font-weight: 500; letter-spacing: 0.5px; }
+  .md-label-small { font-size: 11px; line-height: 16px; font-weight: 500; letter-spacing: 0.5px; }
+
+  /* 高质量玻璃卡片 */
+  .glass-card {
+    background: linear-gradient(135deg, rgba(255,255,255,0.68) 0%, rgba(255,255,255,0.42) 100%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%) brightness(1.04);
+    backdrop-filter: blur(24px) saturate(180%) brightness(1.04);
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    box-shadow:
+      0 1px 2px rgba(60, 64, 67, 0.06),
+      0 8px 24px rgba(103, 80, 164, 0.08),
+      inset 0 1px 0 rgba(255, 255, 255, 0.9),
+      inset 0 -1px 0 rgba(103, 80, 164, 0.04);
+  }
+  .glass-card::before {
+    content: ''; position: absolute;
+    top: 0; left: 12px; right: 12px; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.9), transparent);
+    border-radius: 9999px; pointer-events: none;
+  }
+
+  /* Toast 堆叠 */
+  #toast-stack {
+    position: fixed; left: 50%; bottom: 100px;
+    transform: translateX(-50%);
+    display: flex; flex-direction: column; align-items: center;
+    gap: 8px; z-index: 100000; pointer-events: none;
+    max-width: calc(100vw - 32px);
+  }
+  @media (min-width: 768px) { #toast-stack { bottom: 40px; } }
+  .toast-item {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 10px 18px; border-radius: 9999px;
+    background: rgba(50, 47, 53, 0.95);
+    -webkit-backdrop-filter: blur(16px) saturate(180%);
+    backdrop-filter: blur(16px) saturate(180%);
+    color: #F5EFF7; font-size: 13px; font-weight: 500;
+    letter-spacing: 0.1px; line-height: 1.4;
+    box-shadow:
+      0 4px 8px rgba(0,0,0,0.15),
+      0 8px 24px rgba(0,0,0,0.12),
+      inset 0 1px 0 rgba(255,255,255,0.08);
+    opacity: 0; transform: translateY(16px) scale(0.94);
+    transition:
+      opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+      transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    max-width: 100%;
+  }
+  .toast-item.toast-in { opacity: 1; transform: translateY(0) scale(1); }
+  .toast-item.toast-out {
+    opacity: 0; transform: translateY(8px) scale(0.96);
+    transition: opacity 0.25s cubic-bezier(0.4, 0, 1, 1), transform 0.3s cubic-bezier(0.4, 0, 1, 1);
+  }
+  .toast-item .toast-icon { flex-shrink: 0; width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; }
+  .toast-warn { background: rgba(138, 97, 22, 0.95); color: #FFF4CE; }
+  .toast-success { background: rgba(16, 124, 16, 0.95); color: #E6F4EA; }
+  .toast-info { background: rgba(103, 80, 164, 0.95); color: #EADDFF; }
+
+  /* 加载 */
+  #loader {
+    position: fixed; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    z-index: 999999; background: #FEF7FF;
+    transition: opacity 0.4s ease;
+  }
+  #loader.fade-out { opacity: 0; pointer-events: none; }
+  .loader-inner { display: flex; flex-direction: column; align-items: center; gap: 24px; }
+  .loader-title { font-family: "Google Sans", "Roboto", sans-serif; font-size: 36px; font-weight: 400; color: #6750A4; }
+  .loader-bar { width: 260px; height: 4px; background: #E7E0EC; border-radius: 2px; overflow: hidden; }
+  .loader-fill { height: 100%; width: 0%; background: #6750A4; border-radius: 2px; transition: width 0.3s cubic-bezier(0.4, 0.0, 0.2, 1); }
+  .loader-text { font-size: 11px; font-weight: 500; color: #49454F; letter-spacing: 3px; text-transform: uppercase; }
+
+  /* 输入框 */
+  .md-outlined-field { position: relative; width: 100%; }
+  .md-outlined-field input {
+    width: 100%; padding: 16px;
+    font-family: inherit; font-size: 16px; color: #1D1B20;
+    background: rgba(255, 255, 255, 0.55);
+    border: 1px solid #79747E;
+    border-radius: 6px; outline: none; line-height: 24px;
+    transition: border-color 0.15s cubic-bezier(0.4, 0.0, 0.2, 1),
+                background 0.15s cubic-bezier(0.4, 0.0, 0.2, 1),
+                box-shadow 0.15s cubic-bezier(0.4, 0.0, 0.2, 1);
+  }
+  .md-outlined-field input:hover:not(:focus) { border-color: #1D1B20; background: rgba(255, 255, 255, 0.72); }
+  .md-outlined-field input:focus {
+    border-color: #6750A4; border-width: 2px; padding: 15px;
+    background: rgba(255, 255, 255, 0.92);
+    box-shadow: 0 0 0 3px rgba(103, 80, 164, 0.14);
+  }
+  .md-outlined-field label {
+    position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+    font-size: 16px; color: #49454F; background: rgba(254, 247, 255, 0.88);
+    padding: 0 4px; pointer-events: none;
+    transition: all 0.15s cubic-bezier(0.4, 0.0, 0.2, 1);
+  }
+  .md-outlined-field input:focus + label,
+  .md-outlined-field input:not(:placeholder-shown) + label {
+    top: 0; font-size: 12px; color: #6750A4;
+  }
+
+  /* 按钮 */
+  .md-btn {
+    position: relative; overflow: hidden;
+    display: inline-flex; align-items: center; justify-content: center;
+    gap: 8px; font-family: inherit; font-size: 14px; font-weight: 500;
+    line-height: 20px; letter-spacing: 0.1px;
+    padding: 10px 22px; min-height: 40px;
+    border: none; border-radius: 9999px;
+    cursor: pointer; user-select: none;
+    transition: background-color 0.18s cubic-bezier(0.4, 0.0, 0.2, 1),
+                box-shadow 0.18s cubic-bezier(0.4, 0.0, 0.2, 1),
+                transform 0.1s cubic-bezier(0.4, 0.0, 0.2, 1);
+  }
+  .md-btn:active { transform: scale(0.98); }
+  .md-btn:focus-visible { outline: 2px solid #6750A4; outline-offset: 2px; }
+  .md-btn svg { flex-shrink: 0; }
+  .md-btn-filled { background: #6750A4; color: #FFFFFF; box-shadow: 0 1px 2px rgba(103, 80, 164, 0.18); }
+  .md-btn-filled:hover { background: #7F67BE; box-shadow: 0 1px 2px rgba(0,0,0,0.3), 0 1px 3px 1px rgba(0,0,0,0.15); }
+  .md-btn-filled:active { background: #5B4594; box-shadow: 0 1px 2px rgba(103, 80, 164, 0.18); }
+
+  .md-round-btn {
+    position: relative; overflow: hidden;
+    width: 40px; height: 40px; min-height: 40px; padding: 0;
+    border-radius: 50%; border: none; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-family: "Roboto Mono", Consolas, monospace;
+    font-size: 17px; font-weight: 600; letter-spacing: -0.5px; user-select: none;
+    transition: background-color 0.18s cubic-bezier(0.4, 0.0, 0.2, 1),
+                box-shadow 0.18s cubic-bezier(0.4, 0.0, 0.2, 1),
+                transform 0.1s cubic-bezier(0.4, 0.0, 0.2, 1);
+  }
+  .md-round-btn:active { transform: scale(0.94); }
+  .md-round-btn:focus-visible { outline: 2px solid #6750A4; outline-offset: 2px; }
+  .md-round-btn-tonal { background: #EADDFF; color: #21005D; }
+  .md-round-btn-tonal:hover { background: #E0D0FF; box-shadow: 0 1px 2px rgba(0,0,0,0.3), 0 1px 3px 1px rgba(0,0,0,0.15); }
+  .md-round-btn-tonal:active { background: #D6C6F0; box-shadow: none; }
+  .md-round-btn-outlined { background: transparent; color: #B3261E; border: 1px solid rgba(179, 38, 30, 0.5); }
+  .md-round-btn-outlined:hover { background: rgba(179, 38, 30, 0.08); border-color: #B3261E; }
+  .md-round-btn-outlined:active { background: rgba(179, 38, 30, 0.14); }
+
+  .md-icon-btn {
+    position: relative; overflow: hidden;
+    width: 40px; height: 40px; padding: 0;
+    border-radius: 50%; border: none;
+    background: transparent; color: #49454F; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background-color 0.15s cubic-bezier(0.4, 0.0, 0.2, 1), color 0.15s;
+  }
+  .md-icon-btn:hover { background: rgba(103, 80, 164, 0.08); color: #1D1B20; }
+  .md-icon-btn:active { background: rgba(103, 80, 164, 0.14); }
+  .md-icon-btn:focus-visible { outline: 2px solid #6750A4; outline-offset: 2px; }
+
+  /* 涟漪 */
+  .md-ripple {
+    position: absolute; border-radius: 50%;
+    background: currentColor; opacity: 0; pointer-events: none;
+    transform: scale(0);
+    animation: md-ripple-anim 0.55s cubic-bezier(0.4, 0.0, 0.2, 1) forwards;
+  }
+  @keyframes md-ripple-anim {
+    from { transform: scale(0); opacity: 0.22; }
+    to { transform: scale(2.2); opacity: 0; }
+  }
+
+  .scroll-thin::-webkit-scrollbar { width: 4px; height: 4px; }
+  .scroll-thin::-webkit-scrollbar-thumb { background: rgba(202, 196, 208, 0.6); border-radius: 2px; }
+  .scroll-thin::-webkit-scrollbar-track { background: transparent; }
+
+  .gsap-init { visibility: hidden; }
+
+  /* 键盘面板 */
+  .kb-anim {
+    position: fixed; z-index: 9998; will-change: transform, opacity;
+    transition: bottom 0.2s cubic-bezier(0.2, 0, 0, 1);
+  }
+  .kb-scale { position: relative; transform-origin: bottom center; will-change: transform; }
+  .kb-panel {
+    position: absolute; inset: 0;
+    display: grid;
+    grid-template-rows: auto auto auto minmax(0, 1fr) auto auto;
+    background: rgba(254, 247, 255, 0.82);
+    -webkit-backdrop-filter: blur(32px) saturate(180%) brightness(1.04);
+    backdrop-filter: blur(32px) saturate(180%) brightness(1.04);
+    border-radius: 16px; overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    box-shadow: 0 8px 12px 6px rgba(0,0,0,0.15), 0 4px 4px rgba(0,0,0,0.3);
+  }
+  .kb-header { padding: 8px 16px 4px; }
+  .kb-drag-row { display: flex; justify-content: center; padding: 4px 0 8px; }
+  .kb-drag-handle { width: 32px; height: 4px; background: rgba(202, 196, 208, 0.8); border-radius: 2px; }
+  .kb-title-row { display: flex; align-items: center; justify-content: space-between; padding-top: 2px; }
+  .kb-title { font-size: 16px; font-weight: 500; color: #1D1B20; }
+  .kb-display {
+    padding: 8px 12px; background: rgba(247, 242, 250, 0.7);
+    border-top: 1px solid rgba(202, 196, 208, 0.5);
+    border-bottom: 1px solid rgba(202, 196, 208, 0.5);
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .kb-input {
+    width: 100%; padding: 12px; font-family: inherit; font-size: 14px;
+    color: #1D1B20; background: rgba(255, 255, 255, 0.7);
+    border: 1px solid #79747E; border-radius: 6px; outline: none; line-height: 20px;
+    transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+  }
+  .kb-input:focus {
+    border-color: #6750A4; border-width: 2px; padding: 11px;
+    background: rgba(255, 255, 255, 0.92);
+    box-shadow: 0 0 0 3px rgba(103, 80, 164, 0.12);
+  }
+  .kb-debug {
+    min-height: 24px; padding: 8px 12px; font-size: 12px; line-height: 1.5;
+    background: rgba(255, 255, 255, 0.7);
+    border: 1px solid rgba(202, 196, 208, 0.6);
+    border-radius: 6px; color: #49454F;
+    font-family: "Roboto Mono", monospace;
+    word-break: break-all; overflow-wrap: anywhere; white-space: pre-wrap;
+    max-height: 50px; overflow-y: auto;
+  }
+  .kb-debug:empty::before { content: "Unicode 调试视图"; color: #79747E; }
+  .kb-debug .inv {
+    display: inline-block; padding: 0 4px; margin: 0 1px;
+    background: #F9DEDC; color: #410E0B; border-radius: 2px;
+    font-weight: 500; font-size: 11px;
+  }
+  .kb-tabs { display: flex; gap: 4px; padding: 8px 12px 4px; overflow-x: auto; scrollbar-width: none; }
+  .kb-tabs::-webkit-scrollbar { display: none; }
+  .kb-tab {
+    position: relative; overflow: hidden; flex: 0 0 auto;
+    padding: 6px 12px; font-size: 12px; font-weight: 500;
+    color: #49454F; background: transparent; border: none;
+    border-radius: 9999px; cursor: pointer; white-space: nowrap;
+    display: flex; align-items: center;
+    transition: background-color 0.15s, color 0.15s, box-shadow 0.15s;
+  }
+  .kb-tab:hover { background: rgba(103, 80, 164, 0.08); color: #1D1B20; }
+  .kb-tab.active { background: #EADDFF; color: #21005D; box-shadow: 0 1px 2px rgba(103, 80, 164, 0.1); }
+  .kb-keys { overflow-y: auto; padding: 6px 12px 10px; min-height: 0; overscroll-behavior: contain; }
+  .kb-keys::-webkit-scrollbar { width: 4px; }
+  .kb-keys::-webkit-scrollbar-thumb { background: rgba(202, 196, 208, 0.6); border-radius: 2px; }
+  .kb-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px; }
+  .kb-key {
+    position: relative; overflow: hidden; aspect-ratio: 1 / 1;
+    border: 1px solid rgba(202, 196, 208, 0.7);
+    border-radius: 8px; background: rgba(255, 255, 255, 0.65);
+    color: #1D1B20; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    text-align: center; padding: 0; user-select: none;
+    transition: background-color 0.14s, border-color 0.14s, transform 0.08s, box-shadow 0.14s;
+  }
+  .kb-key:hover { background: rgba(247, 242, 250, 0.92); border-color: #79747E; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+  .kb-key:active { background: #ECE6F0; transform: scale(0.95); }
+  .kb-key-glyph { font-size: 16px; line-height: 1; }
+  .kb-key-label { font-size: 10px; line-height: 1.05; color: #49454F; font-weight: 500; padding: 0 2px; word-break: break-all; }
+  .kb-actions {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 12px;
+    border-top: 1px solid rgba(202, 196, 208, 0.5);
+  }
+  .kb-btn {
+    position: relative; overflow: hidden;
+    font-family: inherit; font-size: 13px; font-weight: 500;
+    padding: 8px 16px; min-height: 36px; border-radius: 9999px;
+    border: none; cursor: pointer; white-space: nowrap;
+    display: flex; align-items: center; justify-content: center;
+    transition: background-color 0.15s, box-shadow 0.15s, transform 0.1s;
+  }
+  .kb-btn:active { transform: scale(0.96); }
+  .kb-btn-icon { width: 36px; height: 36px; padding: 0; background: transparent; color: #49454F; font-size: 16px; }
+  .kb-btn-icon:hover { background: rgba(73, 69, 79, 0.08); }
+  .kb-btn-ghost { background: transparent; color: #6750A4; border: 1px solid #79747E; }
+  .kb-btn-ghost:hover { background: rgba(103, 80, 164, 0.08); }
+  .kb-btn-primary { background: #6750A4; color: #FFFFFF; margin-left: auto; box-shadow: 0 1px 2px rgba(103, 80, 164, 0.18); }
+  .kb-btn-primary:hover { background: #7F67BE; box-shadow: 0 1px 2px rgba(0,0,0,0.3), 0 1px 3px 1px rgba(0,0,0,0.15); }
+  .kb-hint { display: flex; align-items: center; gap: 8px; padding: 0 16px 12px; font-size: 11px; color: #49454F; cursor: pointer; user-select: none; }
+  .kb-hint input { width: 16px; height: 16px; accent-color: #6750A4; cursor: pointer; margin: 0; }
+  .kb-anim.kb-mobile .kb-panel { border-radius: 16px 16px 0 0; border-bottom: none; }
+
+  .desktop-window { max-width: 1080px; max-height: min(720px, calc(100vh - 48px)); width: 100%; height: 100%; }
+
+  /* 低性能降级 */
+  [data-perf="low"] #loader { transition: opacity 0.15s linear; }
+  [data-perf="low"] .loader-fill { transition: width 0.15s linear; }
+  [data-perf="low"] .glass-card {
+    background: rgba(255, 255, 255, 0.85);
+    -webkit-backdrop-filter: none; backdrop-filter: none;
+    border: 1px solid rgba(202, 196, 208, 0.6);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  }
+  [data-perf="low"] .glass-card::before { display: none; }
+  [data-perf="low"] .kb-panel {
+    background: rgba(254, 247, 255, 0.98);
+    -webkit-backdrop-filter: none; backdrop-filter: none;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.18);
+  }
+  [data-perf="low"] .toast-item { -webkit-backdrop-filter: none; backdrop-filter: none; }
+  [data-perf="low"] .md-btn,
+  [data-perf="low"] .md-round-btn,
+  [data-perf="low"] .md-icon-btn,
+  [data-perf="low"] .kb-btn,
+  [data-perf="low"] .kb-tab,
+  [data-perf="low"] .kb-key,
+  [data-perf="low"] .md-outlined-field input,
+  [data-perf="low"] .kb-input {
+    transition: background-color 0.08s linear, border-color 0.08s linear !important;
+  }
+  [data-perf="low"] .md-btn:active,
+  [data-perf="low"] .md-round-btn:active,
+  [data-perf="low"] .kb-btn:active,
+  [data-perf="low"] .kb-key:active { transform: none !important; }
+  [data-perf="low"] .kb-key:hover { box-shadow: none !important; }
+  [data-perf="low"] .md-ripple { display: none !important; }
+  [data-perf="low"] .md-btn-filled,
+  [data-perf="low"] .md-btn-filled:hover,
+  [data-perf="low"] .md-round-btn-tonal:hover,
+  [data-perf="low"] .kb-btn-primary,
+  [data-perf="low"] .kb-tab.active,
+  [data-perf="low"] .md-outlined-field input:focus,
+  [data-perf="low"] .kb-input:focus { box-shadow: none !important; }
+  [data-perf="low"] .kb-anim { transition: none; }
+</style>
+</head>
+<body>
+
+<div id="bg-layer">
+  <img id="bg-img" alt="" referrerpolicy="no-referrer" decoding="async" draggable="false">
+  <div class="bg-mask"></div>
+</div>
+
+<div id="toast-stack"></div>
+
+<div id="loader">
+  <div class="loader-inner">
+    <div class="loader-title">佚名</div>
+    <div class="loader-bar"><div class="loader-fill" id="loaderFill"></div></div>
+    <div class="loader-text">LOADING</div>
+  </div>
+</div>
+
+<div id="app" v-cloak>
+
+  <!-- 移动端 -->
+  <div v-if="isMobile" class="flex flex-col h-full">
+    <header ref="mobileHeaderEl" class="glass-card flex items-center justify-between px-4 h-14 shrink-0 relative gsap-init"
+            style="border-radius: 0; border-left: none; border-right: none; border-top: none;">
+      <div class="flex items-center gap-3">
+        <div ref="mobileLogoEl" class="w-8 h-8 rounded-full flex items-center justify-center" style="background: #EADDFF;">
+          <span class="md-title-small" style="color: #21005D;">佚</span>
+        </div>
+        <span ref="mobileTitleEl" class="md-title-medium" style="color: #1D1B20;">佚名</span>
+      </div>
+      <button ref="mobileResetBtn" @click="resetAll" @pointerdown="addRipple" class="md-icon-btn" title="重置">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>
+        </svg>
+      </button>
+    </header>
+
+    <main ref="mobileMainEl" class="flex-1 overflow-y-auto scroll-thin px-4 py-4 space-y-3 pb-28">
+      <section ref="staggerEl" class="glass-card rounded-2xl p-4 relative gsap-init">
+        <label class="block md-label-medium mb-2" style="color: #49454F;">基础昵称</label>
+        <div class="md-outlined-field">
+          <input v-model="name" type="text" placeholder=" " id="name-input">
+          <label for="name-input">输入你的昵称</label>
+        </div>
+      </section>
+
+      <section ref="staggerEl" class="glass-card rounded-2xl p-4 space-y-3 relative gsap-init">
+        <div>
+          <label class="block md-label-medium mb-2" style="color: #49454F;">效果分类</label>
+          <select v-model="category" class="w-full px-4 py-3 md-body-medium rounded-lg outline-none appearance-none"
+                  style="background: rgba(255,255,255,0.7); border: 1px solid #79747E; color: #1D1B20; background-image: url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%2212%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%2349454F%22 stroke-width=%222%22><polyline points=%226 9 12 15 18 9%22/></svg>'); background-repeat: no-repeat; background-position: right 12px center;">
+            <option value="bidi">双向控制</option>
+            <option value="font">字体转换</option>
+            <option value="oral">口癖</option>
+            <option value="none">无效果</option>
+          </select>
+        </div>
+        <div>
+          <label class="block md-label-medium mb-2" style="color: #49454F;">具体效果</label>
+          <select v-model="effectId" class="w-full px-4 py-3 md-body-medium rounded-lg outline-none appearance-none"
+                  style="background: rgba(255,255,255,0.7); border: 1px solid #79747E; color: #1D1B20; background-image: url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%2212%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%2349454F%22 stroke-width=%222%22><polyline points=%226 9 12 15 18 9%22/></svg>'); background-repeat: no-repeat; background-position: right 12px center;">
+            <option v-for="e in filteredEffects" :key="e.id" :value="e.id">{{ e.label }}</option>
+          </select>
+        </div>
+        <transition @enter="onExpandEnter" @leave="onExpandLeave" :css="false">
+          <div v-if="needsText" ref="expandEl" class="overflow-hidden">
+            <label class="block md-label-medium mb-2 mt-1" style="color: #49454F;">后缀文字内容</label>
+            <div class="md-outlined-field">
+              <input v-model="suffixText" type="text" placeholder=" " id="suffix-input">
+              <label for="suffix-input">例如：The 或 喵~</label>
+            </div>
+          </div>
+        </transition>
+      </section>
+
+      <transition @enter="onAlertEnter" @leave="onAlertLeave" :css="false">
+        <div v-if="alertType" ref="alertEl" class="rounded-xl p-3 md-body-small relative pr-10"
+             :style="alertType === 'red' ? 'background: rgba(249,222,220,0.85); color: #410E0B;' : 'background: rgba(255,244,206,0.85); color: #8A6116;'">
+          <span class="md-label-medium mr-1.5">{{ alertTag }}</span>{{ alertText }}
+          <button @click="alertType = null" class="md-icon-btn absolute top-2 right-2" style="width:24px;height:24px;font-size:14px;">×</button>
+        </div>
+      </transition>
+
+      <section ref="staggerEl" class="glass-card rounded-2xl p-4 relative gsap-init">
+        <label class="block md-label-medium mb-2" style="color: #49454F;">完整昵称</label>
+        <div ref="nicknameBoxEl" class="px-4 py-3 md-body-medium rounded-lg break-all font-mono"
+             style="background: rgba(234,221,255,0.75); color: #21005D;">
+          {{ displayNickname || '—' }}
+        </div>
+        <transition @enter="onExpandEnter" @leave="onExpandLeave" :css="false">
+          <div v-if="showInvisible && hasInvisible" ref="expandEl" class="overflow-hidden mt-2 px-3 py-2 rounded-lg md-body-small font-mono break-all max-h-24 overflow-y-auto scroll-thin"
+               style="background: rgba(236,230,240,0.7); border: 1px dashed #79747E; color: #49454F;">
+            <template v-for="(seg, i) in debugSegments" :key="i">
+              <span v-if="seg.type === 'inv'" class="inline-block px-1.5 mx-px rounded-sm md-label-small"
+                    style="background: #F9DEDC; color: #410E0B;">{{ seg.value }}</span>
+              <template v-else>{{ seg.value }}</template>
+            </template>
+          </div>
+        </transition>
+      </section>
+
+      <label ref="staggerEl" class="glass-card flex items-center gap-3 px-4 py-3 rounded-2xl cursor-pointer relative gsap-init">
+        <input type="checkbox" v-model="showInvisible" style="width: 18px; height: 18px; accent-color: #6750A4;">
+        <span class="md-body-small" style="color: #1D1B20;">显示不可见字符的 Unicode 标记</span>
+      </label>
+
+      <section ref="staggerEl" class="glass-card rounded-2xl p-4 relative gsap-init">
+        <label class="block md-label-medium mb-2" style="color: #49454F;">@ 后文字预览</label>
+        <div class="md-outlined-field">
+          <input v-model="atText" type="text" placeholder=" " id="at-input">
+          <label for="at-input">模拟对方输入的内容</label>
+        </div>
+      </section>
+
+      <section ref="staggerEl" class="glass-card rounded-2xl p-4 relative gsap-init">
+        <div class="flex items-center justify-between mb-2">
+          <label class="md-label-medium" style="color: #49454F;">效果预览</label>
+          <span ref="badgeEl" class="px-2 py-0.5 rounded-full md-label-small" style="background: #EADDFF; color: #21005D;">{{ atText.length }} 字</span>
+        </div>
+        <div class="px-4 py-3 rounded-lg md-body-medium break-all whitespace-pre-wrap"
+             style="background: rgba(255,255,255,0.55); border: 1px solid rgba(202,196,208,0.6); color: #1D1B20;">
+          {{ previewOutput }}
+        </div>
+      </section>
+    </main>
+
+    <div ref="mobileFooterEl" class="absolute bottom-0 left-0 right-0 px-4 pb-4 pt-3 pointer-events-none gsap-init"
+         style="background: linear-gradient(to top, rgba(254,247,255,0.85) 60%, rgba(254,247,255,0));">
+      <div class="flex gap-2 pointer-events-auto">
+        <button ref="primaryBtnRef" @click="copyResult" @pointerdown="addRipple" class="md-btn md-btn-filled flex-1 h-10">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+          </svg>
+          复制完整昵称
+        </button>
+        <button @click="applyResult" @pointerdown="addRipple" class="md-round-btn md-round-btn-tonal" title="固化到基础昵称">=</button>
+        <button @click="clearAll" @pointerdown="addRipple" class="md-round-btn md-round-btn-outlined" title="清空所有配置">C</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 桌面端 -->
+  <div v-else class="h-full flex items-center justify-center p-6">
+    <div class="desktop-window grid grid-cols-[360px_1fr] gap-4">
+      <aside ref="desktopAsideEl" class="glass-card rounded-3xl flex flex-col overflow-hidden relative gsap-init">
+        <div ref="staggerEl2" class="px-6 py-5" style="border-bottom: 1px solid rgba(202,196,208,0.45);">
+          <div class="flex items-center gap-3">
+            <div ref="desktopLogoEl" class="w-10 h-10 rounded-full flex items-center justify-center" style="background: #EADDFF;">
+              <span class="md-title-medium" style="color: #21005D;">佚</span>
+            </div>
+            <div>
+              <h1 class="md-title-large" style="color: #1D1B20;">佚名</h1>
+              <p class="md-body-small mt-0.5" style="color: #49454F;">昵称后缀工具</p>
+            </div>
+          </div>
+        </div>
+
+        <div ref="staggerEl2" class="flex-1 overflow-y-auto scroll-thin p-6 space-y-4">
+          <div>
+            <label class="block md-label-medium mb-2" style="color: #49454F;">基础昵称</label>
+            <div class="md-outlined-field">
+              <input v-model="name" type="text" placeholder=" " id="name-input-desktop">
+              <label for="name-input-desktop">输入你的昵称</label>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block md-label-medium mb-2" style="color: #49454F;">分类</label>
+              <select v-model="category" class="w-full px-4 py-3 md-body-medium rounded-lg outline-none appearance-none"
+                      style="background: rgba(255,255,255,0.7); border: 1px solid #79747E; color: #1D1B20; background-image: url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%2212%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%2349454F%22 stroke-width=%222%22><polyline points=%226 9 12 15 18 9%22/></svg>'); background-repeat: no-repeat; background-position: right 12px center;">
+                <option value="bidi">双向控制</option>
+                <option value="font">字体转换</option>
+                <option value="oral">口癖</option>
+                <option value="none">无效果</option>
+              </select>
+            </div>
+            <div>
+              <label class="block md-label-medium mb-2" style="color: #49454F;">效果</label>
+              <select v-model="effectId" class="w-full px-4 py-3 md-body-medium rounded-lg outline-none appearance-none"
+                      style="background: rgba(255,255,255,0.7); border: 1px solid #79747E; color: #1D1B20; background-image: url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%2212%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%2349454F%22 stroke-width=%222%22><polyline points=%226 9 12 15 18 9%22/></svg>'); background-repeat: no-repeat; background-position: right 12px center;">
+                <option v-for="e in filteredEffects" :key="e.id" :value="e.id">{{ e.label }}</option>
+              </select>
+            </div>
+          </div>
+          <transition @enter="onExpandEnter" @leave="onExpandLeave" :css="false">
+            <div v-if="needsText" ref="expandEl" class="overflow-hidden">
+              <label class="block md-label-medium mb-2" style="color: #49454F;">后缀文字内容</label>
+              <div class="md-outlined-field">
+                <input v-model="suffixText" type="text" placeholder=" " id="suffix-input-desktop">
+                <label for="suffix-input-desktop">例如：The 或 喵~</label>
+              </div>
+            </div>
+          </transition>
+          <transition @enter="onAlertEnter" @leave="onAlertLeave" :css="false">
+            <div v-if="alertType" ref="alertEl" class="rounded-xl p-3 md-body-small relative pr-10"
+                 :style="alertType === 'red' ? 'background: rgba(249,222,220,0.85); color: #410E0B;' : 'background: rgba(255,244,206,0.85); color: #8A6116;'">
+              <span class="md-label-medium mr-1.5">{{ alertTag }}</span>{{ alertText }}
+              <button @click="alertType = null" class="md-icon-btn absolute top-2 right-2" style="width:24px;height:24px;font-size:14px;">×</button>
+            </div>
+          </transition>
+          <label class="flex items-center gap-3 px-3 py-3 rounded-xl cursor-pointer" style="background: rgba(243,237,247,0.55);">
+            <input type="checkbox" v-model="showInvisible" style="width: 18px; height: 18px; accent-color: #6750A4;">
+            <span class="md-body-small" style="color: #1D1B20;">显示不可见字符标记</span>
+          </label>
+        </div>
+
+        <div ref="staggerEl2" class="p-6 flex gap-2" style="border-top: 1px solid rgba(202,196,208,0.45);">
+          <button ref="primaryBtnRef" @click="copyResult" @pointerdown="addRipple" class="md-btn md-btn-filled flex-1 h-10">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+            </svg>
+            复制完整昵称
+          </button>
+          <button @click="applyResult" @pointerdown="addRipple" class="md-round-btn md-round-btn-tonal" title="固化到基础昵称">=</button>
+          <button @click="clearAll" @pointerdown="addRipple" class="md-round-btn md-round-btn-outlined" title="清空所有配置">C</button>
+        </div>
+      </aside>
+
+      <main ref="desktopMainEl" class="glass-card rounded-3xl flex flex-col overflow-hidden relative gsap-init">
+        <div ref="staggerEl3" class="px-6 py-5" style="border-bottom: 1px solid rgba(202,196,208,0.45);">
+          <h2 class="md-title-large" style="color: #1D1B20;">实时预览</h2>
+          <p class="md-body-small mt-0.5" style="color: #49454F;">浏览器渲染，实际效果以微信 / QQ 为准</p>
+        </div>
+        <div ref="staggerEl3" class="flex-1 overflow-y-auto scroll-thin p-6 space-y-5">
+          <div>
+            <label class="block md-label-medium mb-2" style="color: #49454F;">完整昵称</label>
+            <div ref="nicknameBoxEl" class="px-5 py-4 rounded-xl md-body-large break-all font-mono min-h-[60px]"
+                 style="background: rgba(234,221,255,0.75); color: #21005D;">{{ displayNickname || '—' }}</div>
+            <transition @enter="onExpandEnter" @leave="onExpandLeave" :css="false">
+              <div v-if="showInvisible && hasInvisible" ref="expandEl" class="overflow-hidden mt-2 px-4 py-3 rounded-xl md-body-small font-mono break-all max-h-32 overflow-y-auto scroll-thin"
+                   style="background: rgba(236,230,240,0.7); border: 1px dashed #79747E; color: #49454F;">
+                <template v-for="(seg, i) in debugSegments" :key="i">
+                  <span v-if="seg.type === 'inv'" class="inline-block px-1.5 mx-px rounded-sm md-label-small"
+                        style="background: #F9DEDC; color: #410E0B;">{{ seg.value }}</span>
+                  <template v-else>{{ seg.value }}</template>
+                </template>
+              </div>
+            </transition>
+          </div>
+          <div>
+            <label class="block md-label-medium mb-2" style="color: #49454F;">@ 后文字内容</label>
+            <div class="md-outlined-field">
+              <input v-model="atText" type="text" placeholder=" " id="at-input-desktop">
+              <label for="at-input-desktop">模拟对方输入的内容</label>
+            </div>
+          </div>
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <label class="md-label-medium" style="color: #49454F;">效果预览</label>
+              <span ref="badgeEl2" class="px-2 py-0.5 rounded-full md-label-small" style="background: #EADDFF; color: #21005D;">{{ atText.length }} 字</span>
+            </div>
+            <div ref="previewBoxEl" class="px-5 py-4 rounded-xl md-body-medium break-all whitespace-pre-wrap min-h-[100px]"
+                 style="background: rgba(255,255,255,0.55); border: 1px solid rgba(202,196,208,0.6); color: #1D1B20;">{{ previewOutput }}</div>
+          </div>
+          <div class="rounded-2xl p-4 space-y-2" style="background: rgba(243,237,247,0.5); border: 1px solid rgba(202,196,208,0.5);">
+            <div class="md-label-medium" style="color: #49454F;">使用提示</div>
+            <ul class="md-body-small space-y-1.5" style="color: #49454F;">
+              <li class="flex gap-2"><span style="color: #6750A4; font-weight: 700;">•</span>复制完整昵称，粘贴到微信 / QQ 昵称设置</li>
+              <li class="flex gap-2"><span style="color: #6750A4; font-weight: 700;">•</span>双向控制符可实现 @ 后文字反向显示</li>
+              <li class="flex gap-2"><span style="color: #6750A4; font-weight: 700;">•</span>上标、下标只装饰昵称自身，不影响 @ 后文字</li>
+              <li class="flex gap-2"><span style="color: #6750A4; font-weight: 700;">•</span>微信 / QQ 可能过滤不可见字符，效果不稳定</li>
+            </ul>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- 悬浮球 -->
+  <button ref="fabEl" @click="toggleKeyboard" @pointerdown="addRipple"
+    :class="['fixed z-[9999] rounded-2xl flex items-center justify-center overflow-hidden w-14 h-14', isMobile ? 'right-4 bottom-24' : 'right-6 bottom-6']"
+    :style="{
+      background: keyboardOpen ? '#EADDFF' : '#6750A4',
+      color: keyboardOpen ? '#21005D' : '#FFFFFF',
+      boxShadow: lowPerf ? 'none' : (keyboardOpen
+        ? '0 2px 4px rgba(103, 80, 164, 0.2), 0 4px 12px rgba(103, 80, 164, 0.15)'
+        : '0 2px 6px rgba(103, 80, 164, 0.3), 0 4px 12px rgba(103, 80, 164, 0.2)'),
+      transition: lowPerf
+        ? 'background-color 0.1s linear, color 0.1s linear'
+        : 'background-color 0.22s cubic-bezier(0.4,0,0.2,1), color 0.22s cubic-bezier(0.4,0,0.2,1), transform 0.35s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.22s',
+      transform: keyboardOpen ? 'rotate(45deg)' : 'rotate(0deg)'
+    }">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M20 5H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm-9 3h2v2h-2V8zm0 4h2v2h-2v-2zm-4-4h2v2H7V8zm0 4h2v2H7v-2zm-1 4h10v2H6v-2zm11-4h2v2h-2v-2zm0-4h2v2h-2V8z"/>
+    </svg>
+  </button>
+
+  <!-- 键盘面板 -->
+  <transition @enter="onPanelEnter" @leave="onPanelLeave" :css="false">
+    <div v-if="keyboardOpen" ref="panelEl" :class="['kb-anim', isMobile ? 'kb-mobile' : 'kb-desktop']" :style="kbAnimStyle">
+      <div class="kb-scale" :style="kbScaleStyle">
+        <div class="kb-panel">
+          <header class="kb-header">
+            <div v-if="isMobile" class="kb-drag-row"><div class="kb-drag-handle"></div></div>
+            <div class="kb-title-row">
+              <span class="kb-title">Unicode 键盘</span>
+              <button class="md-icon-btn" @click="keyboardOpen = false" @pointerdown="addRipple" title="关闭">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6l-12 12"/></svg>
+              </button>
+            </div>
+          </header>
+          <div class="kb-display">
+            <input ref="kbInputRef" v-model="kbInput" type="text" class="kb-input" placeholder="长按选中字符后可批量处理" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off">
+            <div class="kb-debug">
+              <template v-if="kbInput">
+                <template v-for="(seg, i) in kbDebugSegments" :key="i">
+                  <span v-if="seg.type === 'inv'" class="inv">{{ seg.value }}</span>
+                  <template v-else>{{ seg.value }}</template>
+                </template>
+              </template>
+            </div>
+          </div>
+          <div class="kb-tabs">
+            <button v-for="(cat, key) in KEY_DATA" :key="key" @click="kbTab = key" @pointerdown="addRipple" :class="['kb-tab', kbTab === key ? 'active' : '']">{{ cat.label }}</button>
+          </div>
+          <div class="kb-keys">
+            <div class="kb-grid">
+              <button v-for="(k, i) in KEY_DATA[kbTab].keys" :key="i" @click="handleKey(k)" @pointerdown="addRipple" class="kb-key" :title="k.label + '  U+' + k.char.codePointAt(0).toString(16).toUpperCase().padStart(4, '0')">
+                <span v-if="/^[A-Za-z]+$/.test(k.label)" class="kb-key-label">{{ k.label }}</span>
+                <span v-else class="kb-key-glyph">{{ k.label }}</span>
+              </button>
+            </div>
+          </div>
+          <div class="kb-actions">
+            <button @click="kbBackspace" @pointerdown="addRipple" class="kb-btn kb-btn-icon" title="退格">⌫</button>
+            <button @click="kbClear" @pointerdown="addRipple" class="kb-btn kb-btn-ghost">清空</button>
+            <button @click="kbCopy" @pointerdown="addRipple" class="kb-btn kb-btn-primary">复制</button>
+          </div>
+          <label class="kb-hint">
+            <input type="checkbox" v-model="kbShowInvisible">调试视图显示不可见字符标记
+          </label>
+        </div>
+      </div>
+    </div>
+  </transition>
+
+  <transition @enter="onMaskEnter" @leave="onMaskLeave" :css="false">
+    <div v-if="keyboardOpen" ref="maskEl" @click="keyboardOpen = false" class="fixed inset-0 z-[9997]" style="background: rgba(0,0,0,0.28);"></div>
+  </transition>
+
+</div>
+
+<script>
+/* Toast 系统 */
+(function initToastSystem() {
+  const stack = document.getElementById('toast-stack');
+  if (!stack) return;
+  const ICONS = {
+    info: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>',
+    warn: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+    success: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>'
+  };
+  const MAX_TOASTS = 3;
+  window.showToast = function(message, options) {
+    options = options || {};
+    const duration = options.duration || 2400;
+    const type = options.type || 'info';
+    while (stack.children.length >= MAX_TOASTS) {
+      const old = stack.firstChild;
+      if (!old) break;
+      old.classList.remove('toast-in');
+      old.classList.add('toast-out');
+      setTimeout(() => old.remove(), 300);
+    }
+    const el = document.createElement('div');
+    el.className = 'toast-item toast-' + type;
+    el.innerHTML = '<span class="toast-icon">' + (ICONS[type] || ICONS.info) + '</span><span>' + message + '</span>';
+    stack.appendChild(el);
+    requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('toast-in')));
+    const timer = setTimeout(() => {
+      el.classList.remove('toast-in');
+      el.classList.add('toast-out');
+      setTimeout(() => el.remove(), 320);
+    }, duration);
+    el.addEventListener('toast-kill', () => { clearTimeout(timer); el.remove(); });
+  };
+})();
+
+/* 背景加载 */
+(function loadRandomBg() {
+  const BG_IMAGES = [
+    'https://upload-bbs.miyoushe.com/upload/2020/04/13/20099977/563f94a1ea32de72682126951ac696ee_7134369089898959442.png',
+    'https://upload-bbs.miyoushe.com/upload/2020/04/13/20099977/3dca8d2f7ad2804d895182fd5ba4d351_329811249738865710.png',
+    'https://reminderyears.github.io/image/IMG_1255.PNG',
+    'https://reminderyears.github.io/image/IMG_1228.PNG',
+  ];
+  const img = document.getElementById('bg-img');
+  if (!img) return;
+  const shuffled = BG_IMAGES.slice().sort(() => Math.random() - 0.5);
+  let idx = 0;
+  const tryLoad = () => {
+    if (idx >= shuffled.length) return;
+    const url = shuffled[idx++];
+    img.onload = () => { img.classList.add('loaded'); };
+    img.onerror = () => { tryLoad(); };
+    img.src = url;
+  };
+  tryLoad();
+})();
+
+/* GSAP 缓动 */
+gsap.registerPlugin(CustomEase);
+CustomEase.create("mdDecelerate", "M0,0 C0,0 0.2,1 1,1");
+CustomEase.create("mdAccelerate", "M0,0 C0.4,0 1,1 1,1");
+const EASE_DECELERATE = 'mdDecelerate';
+const EASE_ACCELERATE = 'mdAccelerate';
+const KB_DESIGN_W = 360;
+const KB_DESIGN_H = 500;
+const LOW_PERF = !!window.__PERF_LOW__;
+
+/* 数据表（保持原样） */
+const SUPERSCRIPT_MAP = {'a':'ᵃ','b':'ᵇ','c':'ᶜ','d':'ᵈ','e':'ᵉ','f':'ᶠ','g':'ᵍ','h':'ʰ','i':'ⁱ','j':'ʲ','k':'ᵏ','l':'ˡ','m':'ᵐ','n':'ⁿ','o':'ᵒ','p':'ᵖ','q':'q','r':'ʳ','s':'ˢ','t':'ᵗ','u':'ᵘ','v':'ᵛ','w':'ʷ','x':'ˣ','y':'ʸ','z':'ᶻ','A':'ᴬ','B':'ᴮ','C':'ᶜ','D':'ᴰ','E':'ᴱ','F':'ᶠ','G':'ᴳ','H':'ᴴ','I':'ᴵ','J':'ᴶ','K':'ᴷ','L':'ᴸ','M':'ᴹ','N':'ᴺ','O':'ᴼ','P':'ᴾ','Q':'Q','R':'ᴿ','S':'ˢ','T':'ᵀ','U':'ᵁ','V':'ⱽ','W':'ᵂ','X':'ˣ','Y':'ʸ','Z':'ᶻ','0':'⁰','1':'¹','2':'²','3':'³','4':'⁴','5':'⁵','6':'⁶','7':'⁷','8':'⁸','9':'⁹','+':'⁺','-':'⁻','=':'⁼','(':'⁽',')':'⁾'};
+const SUBSCRIPT_MAP = {'a':'ₐ','e':'ₑ','h':'ₕ','i':'ᵢ','j':'ⱼ','k':'ₖ','l':'ₗ','m':'ₘ','n':'ₙ','o':'ₒ','p':'ₚ','r':'ᵣ','s':'ₛ','t':'ₜ','u':'ᵤ','v':'ᵥ','x':'ₓ','0':'₀','1':'₁','2':'₂','3':'₃','4':'₄','5':'₅','6':'₆','7':'₇','8':'₈','9':'₉','+':'₊','-':'₋','=':'₌','(':'₍',')':'₎'};
+const SMALLCAPS_MAP = {'a':'ᴀ','b':'ʙ','c':'ᴄ','d':'ᴅ','e':'ᴇ','f':'ꜰ','g':'ɢ','h':'ʜ','i':'ɪ','j':'ᴊ','k':'ᴋ','l':'ʟ','m':'ᴍ','n':'ɴ','o':'ᴏ','p':'ᴘ','q':'ǫ','r':'ʀ','s':'ꜱ','t':'ᴛ','u':'ᴜ','v':'ᴠ','w':'ᴡ','x':'x','y':'ʏ','z':'ᴢ'};
+const MATH_BOLD_MAP = {'a':'𝐚','b':'𝐛','c':'𝐜','d':'𝐝','e':'𝐞','f':'𝐟','g':'𝐠','h':'𝐡','i':'𝐢','j':'𝐣','k':'𝐤','l':'𝐥','m':'𝐦','n':'𝐧','o':'𝐨','p':'𝐩','q':'𝐪','r':'𝐫','s':'𝐬','t':'𝐭','u':'𝐮','v':'𝐯','w':'𝐰','x':'𝐱','y':'𝐲','z':'𝐳','A':'𝐀','B':'𝐁','C':'𝐂','D':'𝐃','E':'𝐄','F':'𝐅','G':'𝐆','H':'𝐇','I':'𝐈','J':'𝐉','K':'𝐊','L':'𝐋','M':'𝐌','N':'𝐍','O':'𝐎','P':'𝐏','Q':'𝐐','R':'𝐑','S':'𝐒','T':'𝐓','U':'𝐔','V':'𝐕','W':'𝐖','X':'𝐗','Y':'𝐘','Z':'𝐙','0':'𝟎','1':'𝟏','2':'𝟐','3':'𝟑','4':'𝟒','5':'𝟓','6':'𝟔','7':'𝟕','8':'𝟖','9':'𝟗'};
+const MATH_ITALIC_MAP = {'a':'𝑎','b':'𝑏','c':'𝑐','d':'𝑑','e':'𝑒','f':'𝑓','g':'𝑔','h':'ℎ','i':'𝑖','j':'𝑗','k':'𝑘','l':'𝑙','m':'𝑚','n':'𝑛','o':'𝑜','p':'𝑝','q':'𝑞','r':'𝑟','s':'𝑠','t':'𝑡','u':'𝑢','v':'𝑣','w':'𝑤','x':'𝑥','y':'𝑦','z':'𝑧','A':'𝐴','B':'𝐵','C':'𝐶','D':'𝐷','E':'𝐸','F':'𝐹','G':'𝐺','H':'𝐻','I':'𝐼','J':'𝐽','K':'𝐾','L':'𝐿','M':'𝑀','N':'𝑁','O':'𝑂','P':'𝑃','Q':'𝑄','R':'𝑅','S':'𝑆','T':'𝑇','U':'𝑈','V':'𝑉','W':'𝑊','X':'𝑋','Y':'𝑌','Z':'𝑍'};
+const MATH_SCRIPT_MAP = {'a':'𝒶','b':'𝒷','c':'𝒸','d':'𝒹','e':'ℯ','f':'𝒻','g':'ℊ','h':'𝒽','i':'𝒾','j':'𝒿','k':'𝓀','l':'𝓁','m':'𝓂','n':'𝓃','o':'ℴ','p':'𝓅','q':'𝓆','r':'𝓇','s':'𝓈','t':'𝓉','u':'𝓊','v':'𝓋','w':'𝓌','x':'𝓍','y':'𝓎','z':'𝓏','A':'𝒜','B':'ℬ','C':'𝒞','D':'𝒟','E':'ℰ','F':'ℱ','G':'𝒢','H':'ℋ','I':'ℐ','J':'𝒥','K':'𝒦','L':'ℒ','M':'ℳ','N':'𝒩','O':'𝒪','P':'𝒫','Q':'𝒬','R':'ℛ','S':'𝒮','T':'𝒯','U':'𝒰','V':'𝒱','W':'𝒲','X':'𝒳','Y':'𝒴','Z':'𝒵'};
+
+const EFFECTS = [
+  {id:'rlo',cat:'bidi',label:'从右到左覆盖 (RLO) · 反向',type:'bidi',char:'\u202E',alert:'red'},
+  {id:'rli',cat:'bidi',label:'从右到左隔离 (RLI)',type:'bidi',char:'\u2067',alert:'red'},
+  {id:'rle',cat:'bidi',label:'从右到左嵌入 (RLE)',type:'bidi',char:'\u202B',alert:'red'},
+  {id:'lro',cat:'bidi',label:'从左到右覆盖 (LRO)',type:'bidi',char:'\u202D',alert:'red'},
+  {id:'lre',cat:'bidi',label:'从左到右嵌入 (LRE)',type:'bidi',char:'\u202A',alert:'red'},
+  {id:'rlm',cat:'bidi',label:'从右到左标记 (RLM)',type:'bidi',char:'\u200F',alert:'red'},
+  {id:'lrm',cat:'bidi',label:'从左到右标记 (LRM)',type:'bidi',char:'\u200E',alert:'red'},
+  {id:'superscript',cat:'font',label:'上标 (ᵀʰᵉ)',type:'map',map:SUPERSCRIPT_MAP,alert:'yellow'},
+  {id:'subscript',cat:'font',label:'下标 (ₜₕₑ)',type:'map',map:SUBSCRIPT_MAP,alert:'yellow'},
+  {id:'smallcaps',cat:'font',label:'小型大写 (ᴛʜᴇ)',type:'map',map:SMALLCAPS_MAP,alert:'yellow'},
+  {id:'math-bold',cat:'font',label:'数学粗体 (𝐓𝐡𝐞)',type:'map',map:MATH_BOLD_MAP,alert:'yellow'},
+  {id:'math-italic',cat:'font',label:'数学斜体 (𝑇ℎ𝑒)',type:'map',map:MATH_ITALIC_MAP,alert:'yellow'},
+  {id:'math-script',cat:'font',label:'数学手写体 (𝒯𝒽ℯ)',type:'map',map:MATH_SCRIPT_MAP,alert:'yellow'},
+  {id:'fullwidth',cat:'font',label:'全角 (Ｔｈｅ)',type:'fullwidth',alert:'yellow'},
+  {id:'meow',cat:'oral',label:'喵~',type:'text',text:'喵~'},
+  {id:'de',cat:'oral',label:'的说',type:'text',text:'的说'},
+  {id:'ne',cat:'oral',label:'捏',type:'text',text:'捏'},
+  {id:'da',cat:'oral',label:'哒',type:'text',text:'哒'},
+  {id:'custom',cat:'oral',label:'自定义文本',type:'custom'},
+  {id:'none',cat:'none',label:'无效果',type:'none'}
+];
+
+const ALERTS = {
+  red:{tag:'⚠ 不可见字符',text:'该效果使用肉眼不可见的 Unicode 双向控制字符。微信 / QQ 可能过滤或自动闭合，实际效果与预览可能不符。'},
+  yellow:{tag:'⚠ 物理限制',text:'上标、下标等字体转换只能改变昵称自身的显示，无法影响对方输入的文字。'},
+  truncate:{tag:'⚠ 截断风险',text:'@ 后文字超过 10 个字符，双向控制效果可能被截断，出现前后分段倒转的现象。'}
+};
+
+const VISIBLE_LABELS = {
+  '\u202A':'[LRE]','\u202B':'[RLE]','\u202D':'[LRO]','\u202E':'[RLO]',
+  '\u2066':'[LRI]','\u2067':'[RLI]','\u2068':'[FSI]',
+  '\u200E':'[LRM]','\u200F':'[RLM]','\u061C':'[ALM]',
+  '\u202C':'[PDF]','\u2069':'[PDI]',
+  '\u200B':'[ZWSP]','\u200C':'[ZWNJ]','\u200D':'[ZWJ]',
+  '\u2060':'[WJ]','\uFEFF':'[BOM]','\u00AD':'[SHY]',
+  '\u2800':'[盲空]','\u3000':'[全角]','\u00A0':'[NBSP]',
+  '\u0332':'[̲]','\u0333':'[̳]','\u0336':'[̶]','\u0335':'[̵]',
+  '\u0330':'[̰]','\u0334':'[̴]','\u0305':'[̅]','\u033F':'[̿]',
+  '\u0338':'[̸]','\u0347':'[͇]','\u0307':'[̇]','\u030A':'[̊]',
+  '\u0308':'[̈]','\u0302':'[̂]','\u0303':'[̃]','\u0301':'[́]',
+  '\u0300':'[̀]','\u0304':'[̄]','\u0306':'[̆]','\u0325':'[̥]',
+  '\u035C':'[͡]','\u0361':'[͜]'
+};
+
+function fromMap(map) { return Object.values(map).map(ch => ({label:ch,char:ch})); }
+
+const KEY_DATA = {
+  zero:{label:'零宽',mode:'insert',keys:[
+    {label:'ZWSP',char:'\u200B'},{label:'ZWNJ',char:'\u200C'},{label:'ZWJ',char:'\u200D'},
+    {label:'WJ',char:'\u2060'},{label:'BOM',char:'\uFEFF'},{label:'SHY',char:'\u00AD'},
+    {label:'盲空',char:'\u2800'},{label:'全角',char:'\u3000'},{label:'LRM',char:'\u200E'},
+    {label:'RLM',char:'\u200F'},{label:'ALM',char:'\u061C'},{label:'NBSP',char:'\u00A0'}
+  ]},
+  super:{label:'上标',mode:'map',map:SUPERSCRIPT_MAP,keys:fromMap(SUPERSCRIPT_MAP)},
+  sub:{label:'下标',mode:'map',map:SUBSCRIPT_MAP,keys:fromMap(SUBSCRIPT_MAP)},
+  small:{label:'小型',mode:'map',map:SMALLCAPS_MAP,keys:fromMap(SMALLCAPS_MAP)},
+  bold:{label:'粗体',mode:'map',map:MATH_BOLD_MAP,keys:fromMap(MATH_BOLD_MAP)},
+  italic:{label:'斜体',mode:'map',map:MATH_ITALIC_MAP,keys:fromMap(MATH_ITALIC_MAP)},
+  script:{label:'手写',mode:'map',map:MATH_SCRIPT_MAP,keys:fromMap(MATH_SCRIPT_MAP)},
+  bidi:{label:'双向',mode:'insert',keys:[
+    {label:'RLO',char:'\u202E'},{label:'LRO',char:'\u202D'},{label:'RLE',char:'\u202B'},
+    {label:'LRE',char:'\u202A'},{label:'RLI',char:'\u2067'},{label:'LRI',char:'\u2066'},
+    {label:'FSI',char:'\u2068'},{label:'PDF',char:'\u202C'},{label:'PDI',char:'\u2069'},
+    {label:'LRM',char:'\u200E'},{label:'RLM',char:'\u200F'},{label:'ALM',char:'\u061C'}
+  ]},
+  combine:{label:'组合',mode:'combine',keys:[
+    {label:'◌̲',char:'\u0332'},{label:'◌̳',char:'\u0333'},{label:'◌̶',char:'\u0336'},
+    {label:'◌̵',char:'\u0335'},{label:'◌̰',char:'\u0330'},{label:'◌̴',char:'\u0334'},
+    {label:'◌̅',char:'\u0305'},{label:'◌̿',char:'\u033F'},{label:'◌̸',char:'\u0338'},
+    {label:'◌͇',char:'\u0347'},{label:'◌̇',char:'\u0307'},{label:'◌̊',char:'\u030A'},
+    {label:'◌̈',char:'\u0308'},{label:'◌̂',char:'\u0302'},{label:'◌̃',char:'\u0303'},
+    {label:'◌́',char:'\u0301'},{label:'◌̀',char:'\u0300'},{label:'◌̄',char:'\u0304'},
+    {label:'◌̆',char:'\u0306'},{label:'◌̥',char:'\u0325'},{label:'◌͡',char:'\u035C'},
+    {label:'◌͜',char:'\u0361'}
+  ]},
+  deco:{label:'装饰',mode:'insert',keys:[
+    {label:'★',char:'★'},{label:'☆',char:'☆'},{label:'✦',char:'✦'},{label:'✧',char:'✧'},
+    {label:'✨',char:'✨'},{label:'♡',char:'♡'},{label:'♥',char:'♥'},{label:'❀',char:'❀'},
+    {label:'✿',char:'✿'},{label:'❁',char:'❁'},{label:'♪',char:'♪'},{label:'♫',char:'♫'},
+    {label:'♬',char:'♬'},{label:'←',char:'←'},{label:'↑',char:'↑'},{label:'→',char:'→'},
+    {label:'↓',char:'↓'},{label:'☀',char:'☀'},{label:'☁',char:'☁'},{label:'☂',char:'☂'},
+    {label:'☃',char:'☃'},{label:'✉',char:'✉'}
+  ]}
+};
+
+const { createApp, ref, computed, watch, nextTick, onMounted, onUnmounted } = Vue;
+
+createApp({
+  setup() {
+    const isMobile = ref(window.innerWidth < 768);
+    const name = ref('冰上的房子');
+    const category = ref('bidi');
+    const effectId = ref('rlo');
+    const suffixText = ref('The');
+    const atText = ref('The quick brown fox jumps over the lazy dog 敏捷的棕色狐狸跳过懒狗');
+    const showInvisible = ref(false);
+    const alertType = ref('red');
+    const keyboardOpen = ref(false);
+    const kbTab = ref('zero');
+    const kbInput = ref('');
+    const kbShowInvisible = ref(true);
+    const kbInputRef = ref(null);
+    const kbScale = ref(1);
+    const kbBottom = ref(20);
+    const lowPerf = ref(LOW_PERF);
+
+    const mobileHeaderEl = ref(null), mobileLogoEl = ref(null), mobileTitleEl = ref(null);
+    const mobileResetBtn = ref(null), mobileMainEl = ref(null), mobileFooterEl = ref(null);
+    const desktopAsideEl = ref(null), desktopMainEl = ref(null), desktopLogoEl = ref(null);
+    const primaryBtnRef = ref(null), fabEl = ref(null), panelEl = ref(null), maskEl = ref(null);
+    const alertEl = ref(null), expandEl = ref(null);
+    const badgeEl = ref(null), badgeEl2 = ref(null);
+    const nicknameBoxEl = ref(null), previewBoxEl = ref(null);
+
+    const onResize = () => { isMobile.value = window.innerWidth < 768; };
+    window.addEventListener('resize', onResize);
+
+    let kbRafId = null;
+    const scheduleKbLayout = () => {
+      if (kbRafId) cancelAnimationFrame(kbRafId);
+      kbRafId = requestAnimationFrame(() => { kbRafId = null; updateKbLayout(); });
+    };
+
+    const updateKbLayout = () => {
+      if (!keyboardOpen.value) return;
+      const vv = window.visualViewport;
+      const vh = vv ? vv.height : window.innerHeight;
+      const vw = window.innerWidth;
+      const offsetTop = vv ? vv.offsetTop : 0;
+      const keyboardInset = Math.max(0, window.innerHeight - vh - offsetTop);
+      if (isMobile.value) {
+        const availW = vw - 16;
+        const availH = vh - 24;
+        const scale = Math.min(1, availW / KB_DESIGN_W, availH / KB_DESIGN_H);
+        kbScale.value = Math.max(0.78, scale);
+        kbBottom.value = keyboardInset + 20;
+      } else {
+        kbScale.value = 1;
+        kbBottom.value = 80;
+      }
+    };
+
+    const kbAnimStyle = computed(() => {
+      if (isMobile.value) {
+        return { left: `calc(50% - ${KB_DESIGN_W / 2}px)`, bottom: kbBottom.value + 'px' };
+      }
+      return { right: '24px', bottom: kbBottom.value + 'px' };
+    });
+    const kbScaleStyle = computed(() => ({
+      transform: `scale(${kbScale.value})`,
+      width: KB_DESIGN_W + 'px',
+      height: KB_DESIGN_H + 'px',
+    }));
+
+    const onVVChange = () => scheduleKbLayout();
+    window.addEventListener('resize', scheduleKbLayout);
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', onVVChange);
+      window.visualViewport.addEventListener('scroll', onVVChange);
+    }
+    onUnmounted(() => {
+      window.removeEventListener('resize', onResize);
+      window.removeEventListener('resize', scheduleKbLayout);
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', onVVChange);
+        window.visualViewport.removeEventListener('scroll', onVVChange);
+      }
+      if (kbRafId) cancelAnimationFrame(kbRafId);
+    });
+
+    watch(keyboardOpen, (open) => { if (open) nextTick(updateKbLayout); });
+
+    const filteredEffects = computed(() => EFFECTS.filter(e => e.cat === category.value));
+    const currentEffect = computed(() => EFFECTS.find(e => e.id === effectId.value) || EFFECTS.find(e => e.id === 'none'));
+    const needsText = computed(() => {
+      const t = currentEffect.value.type;
+      return t === 'map' || t === 'fullwidth' || t === 'custom';
+    });
+
+    const builtSuffix = computed(() => {
+      const e = currentEffect.value;
+      if (!e) return '';
+      switch (e.type) {
+        case 'bidi': return e.char;
+        case 'map': { let out=''; for (const ch of suffixText.value) out += (e.map[ch] !== undefined ? e.map[ch] : ch); return out; }
+        case 'fullwidth': {
+          let out = '';
+          for (const ch of suffixText.value) {
+            const code = ch.charCodeAt(0);
+            if (code === 32) out += '\u3000';
+            else if (code >= 0x21 && code <= 0x7E) out += String.fromCharCode(code + 0xFEE0);
+            else out += ch;
+          }
+          return out;
+        }
+        case 'text': return e.text;
+        case 'custom': return suffixText.value;
+        default: return '';
+      }
+    });
+
+    const fullNickname = computed(() => name.value + builtSuffix.value);
+    const displayNickname = computed(() => {
+      if (!showInvisible.value) return fullNickname.value;
+      let out = '';
+      for (const ch of fullNickname.value) out += VISIBLE_LABELS[ch] || ch;
+      return out;
+    });
+    const hasInvisible = computed(() => {
+      for (const ch of fullNickname.value) if (VISIBLE_LABELS[ch]) return true;
+      return false;
+    });
+    const debugSegments = computed(() => {
+      const segs = [];
+      for (const ch of fullNickname.value) {
+        if (VISIBLE_LABELS[ch]) segs.push({type:'inv', value:VISIBLE_LABELS[ch]});
+        else segs.push({type:'text', value:ch});
+      }
+      return segs;
+    });
+    const previewOutput = computed(() => '@' + displayNickname.value + ' ' + atText.value);
+    const kbDebugSegments = computed(() => {
+      const segs = [];
+      if (!kbShowInvisible.value) {
+        if (kbInput.value) segs.push({type:'text', value:kbInput.value});
+        return segs;
+      }
+      for (const ch of kbInput.value) {
+        if (VISIBLE_LABELS[ch]) segs.push({type:'inv', value:VISIBLE_LABELS[ch]});
+        else segs.push({type:'text', value:ch});
+      }
+      return segs;
+    });
+
+    const alertTag = computed(() => {
+      if (!alertType.value) return '';
+      const key = alertType.value === 'truncate' ? 'truncate' : alertType.value;
+      return ALERTS[key] ? ALERTS[key].tag : '';
+    });
+    const alertText = computed(() => {
+      if (!alertType.value) return '';
+      const key = alertType.value === 'truncate' ? 'truncate' : alertType.value;
+      return ALERTS[key] ? ALERTS[key].text : '';
+    });
+
+    const staggerChildren = (els, baseDelay = 0.08) => {
+      const list = Array.from(els).filter(Boolean);
+      if (!list.length) return;
+      if (lowPerf.value) { list.forEach(el => { el.style.visibility = 'visible'; }); return; }
+      gsap.set(list, { visibility: 'visible' });
+      gsap.fromTo(list, { opacity: 0, y: 12 },
+        { opacity: 1, y: 0, duration: 0.35, ease: EASE_DECELERATE,
+          stagger: { each: 0.04, from: 'start' }, delay: baseDelay, clearProps: 'transform' });
+    };
+
+    const onAlertEnter = (el, done) => {
+      if (lowPerf.value) { el.style.visibility = 'visible'; el.style.opacity = '1'; done(); return; }
+      gsap.set(el, { visibility: 'visible' });
+      gsap.fromTo(el,
+        { opacity: 0, height: 0, marginBottom: 0, paddingTop: 0, paddingBottom: 0 },
+        { opacity: 1, height: 'auto', marginBottom: 10, paddingTop: '0.75rem', paddingBottom: '0.75rem',
+          duration: 0.25, ease: EASE_DECELERATE, onComplete: done });
+    };
+    const onAlertLeave = (el, done) => {
+      if (lowPerf.value) { done(); return; }
+      gsap.to(el, { opacity: 0, height: 0, marginBottom: 0, paddingTop: 0, paddingBottom: 0,
+        duration: 0.2, ease: EASE_ACCELERATE, onComplete: done });
+    };
+
+    const onExpandEnter = (el, done) => {
+      if (lowPerf.value) { el.style.visibility = 'visible'; el.style.opacity = '1'; done(); return; }
+      gsap.set(el, { visibility: 'visible' });
+      gsap.fromTo(el, { opacity: 0, height: 0, marginTop: 0 },
+        { opacity: 1, height: 'auto', marginTop: 8, duration: 0.28, ease: EASE_DECELERATE, onComplete: done });
+    };
+    const onExpandLeave = (el, done) => {
+      if (lowPerf.value) { done(); return; }
+      gsap.to(el, { opacity: 0, height: 0, marginTop: 0, duration: 0.2, ease: EASE_ACCELERATE, onComplete: done });
+    };
+
+    const onPanelEnter = (el, done) => {
+      if (lowPerf.value) { el.style.visibility = 'visible'; el.style.opacity = '1'; done(); return; }
+      gsap.set(el, { visibility: 'visible' });
+      const mobile = isMobile.value;
+      gsap.fromTo(el,
+        mobile
+          ? { opacity: 0, y: 80, scale: 0.94, transformOrigin: 'bottom center' }
+          : { opacity: 0, x: 60, y: 60, scale: 0.85, transformOrigin: 'bottom right' },
+        { opacity: 1, x: 0, y: 0, scale: 1, duration: 0.42, ease: EASE_DECELERATE,
+          onComplete: () => {
+            const keys = el.querySelectorAll('.kb-key');
+            if (keys.length) {
+              gsap.fromTo(keys, { opacity: 0, y: 6 },
+                { opacity: 1, y: 0, duration: 0.3, ease: EASE_DECELERATE,
+                  stagger: { each: 0.006, from: 'start' }, clearProps: 'transform' });
+            }
+            done();
+          }});
+    };
+    const onPanelLeave = (el, done) => {
+      if (lowPerf.value) { done(); return; }
+      const mobile = isMobile.value;
+      gsap.to(el, {
+        opacity: 0,
+        ...(mobile ? { y: 60, scale: 0.96 } : { x: 40, y: 40, scale: 0.9 }),
+        duration: 0.24, ease: EASE_ACCELERATE, onComplete: done,
+      });
+    };
+
+    const onMaskEnter = (el, done) => {
+      if (lowPerf.value) { el.style.visibility = 'visible'; el.style.opacity = '1'; done(); return; }
+      gsap.set(el, { visibility: 'visible' });
+      gsap.fromTo(el, { opacity: 0 }, { opacity: 1, duration: 0.2, ease: EASE_DECELERATE, onComplete: done });
+    };
+    const onMaskLeave = (el, done) => {
+      if (lowPerf.value) { done(); return; }
+      gsap.to(el, { opacity: 0, duration: 0.18, ease: EASE_ACCELERATE, onComplete: done });
+    };
+
+    const bumpBadge = (el) => {
+      if (!el || lowPerf.value) return;
+      gsap.killTweensOf(el);
+      gsap.fromTo(el, { scale: 1 },
+        { scale: 1.15, duration: 0.15, ease: 'power2.out',
+          onComplete: () => gsap.to(el, { scale: 1, duration: 0.3, ease: EASE_DECELERATE }) });
+    };
+    const pulseNickname = (el) => {
+      if (!el || lowPerf.value) return;
+      gsap.killTweensOf(el);
+      gsap.fromTo(el, { boxShadow: '0 0 0 0 rgba(103,80,164,0.4)' },
+        { boxShadow: '0 0 0 10px rgba(103,80,164,0)', duration: 0.5, ease: 'power2.out' });
+    };
+
+    const addRipple = (e) => {
+      if (lowPerf.value) return;
+      const target = e.currentTarget;
+      if (!target || target.disabled) return;
+      const rect = target.getBoundingClientRect();
+      const size = Math.max(rect.width, rect.height);
+      const x = e.clientX - rect.left - size / 2;
+      const y = e.clientY - rect.top - size / 2;
+      const ripple = document.createElement('span');
+      ripple.className = 'md-ripple';
+      ripple.style.width = ripple.style.height = size + 'px';
+      ripple.style.left = x + 'px'; ripple.style.top = y + 'px';
+      target.appendChild(ripple);
+      setTimeout(() => ripple.remove(), 650);
+    };
+
+    watch(category, () => {
+      const list = EFFECTS.filter(e => e.cat === category.value);
+      if (!list.some(e => e.id === effectId.value) && list.length) effectId.value = list[0].id;
+      suffixText.value = '';
+    });
+
+    const updateAlert = () => {
+      const e = currentEffect.value;
+      if (e.alert === 'red') alertType.value = atText.value.length > 10 ? 'truncate' : 'red';
+      else if (e.alert === 'yellow') alertType.value = 'yellow';
+      else alertType.value = null;
+    };
+    watch([effectId, atText], updateAlert, { immediate: true });
+    watch(() => atText.value.length, () => { bumpBadge(badgeEl.value); bumpBadge(badgeEl2.value); });
+    watch(fullNickname, () => { pulseNickname(nicknameBoxEl.value); });
+
+    const toggleKeyboard = () => {
+      keyboardOpen.value = !keyboardOpen.value;
+      if (keyboardOpen.value) {
+        nextTick(() => {
+          updateKbLayout();
+          setTimeout(() => { if (kbInputRef.value) kbInputRef.value.focus(); }, lowPerf.value ? 50 : 180);
+        });
+      }
+    };
+
+    const handleKey = (k) => {
+      const cat = KEY_DATA[kbTab.value];
+      const text = kbInput.value;
+      const input = kbInputRef.value;
+      let start = input ? input.selectionStart : text.length;
+      let end = input ? input.selectionEnd : text.length;
+      let newText, cursorStart, cursorEnd;
+      if (cat.mode === 'map') {
+        const selected = text.slice(start, end);
+        const hasSel = start !== end;
+        const target = hasSel ? selected : '';
+        const converted = [...target].map(c => cat.map[c] || c).join('');
+        if (hasSel) {
+          newText = text.slice(0, start) + converted + text.slice(end);
+          cursorStart = start; cursorEnd = start + converted.length;
+        } else {
+          const single = cat.map[k.char] || k.char;
+          newText = text.slice(0, start) + single + text.slice(end);
+          cursorStart = cursorEnd = start + single.length;
+        }
+      } else if (cat.mode === 'combine') {
+        const selected = text.slice(start, end);
+        const hasSel = start !== end;
+        const target = hasSel ? selected : text;
+        const combined = [...target].map(c => c + k.char).join('');
+        if (hasSel) {
+          newText = text.slice(0, start) + combined + text.slice(end);
+          cursorStart = start; cursorEnd = start + combined.length;
+        } else {
+          newText = combined;
+          cursorStart = cursorEnd = newText.length;
+        }
+      } else {
+        newText = text.slice(0, start) + k.char + text.slice(end);
+        cursorStart = cursorEnd = start + k.char.length;
+      }
+      kbInput.value = newText;
+      nextTick(() => { if (input) { input.focus(); input.setSelectionRange(cursorStart, cursorEnd); } });
+    };
+
+    const kbBackspace = () => {
+      const input = kbInputRef.value;
+      const text = kbInput.value;
+      const start = input ? input.selectionStart : 0;
+      const end = input ? input.selectionEnd : 0;
+      if (start !== end) {
+        kbInput.value = text.slice(0, start) + text.slice(end);
+        nextTick(() => input && input.setSelectionRange(start, start));
+      } else if (start > 0) {
+        const before = [...text.slice(0, start)];
+        before.pop();
+        const newBefore = before.join('');
+        kbInput.value = newBefore + text.slice(end);
+        nextTick(() => input && input.setSelectionRange(newBefore.length, newBefore.length));
+      }
+    };
+
+    const kbClear = () => { kbInput.value = ''; nextTick(() => kbInputRef.value && kbInputRef.value.focus()); };
+    const kbCopy = async () => {
+      if (!kbInput.value) return window.showToast('内容为空', { type: 'info' });
+      await copyText(kbInput.value);
+      window.showToast('已复制 ' + [...kbInput.value].length + ' 个字符', { type: 'success' });
+    };
+
+    const copyText = async (text) => {
+      try { await navigator.clipboard.writeText(text); }
+      catch (e) {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); } catch (_) {}
+        document.body.removeChild(ta);
+      }
+    };
+
+    const copyResult = async () => {
+      if (!fullNickname.value) return;
+      await copyText(fullNickname.value);
+      window.showToast('已复制完整昵称', { type: 'success' });
+    };
+    const applyResult = () => {
+      if (!fullNickname.value) return window.showToast('结果为空', { type: 'warn' });
+      name.value = fullNickname.value;
+      category.value = 'none';
+      nextTick(() => { effectId.value = 'none'; suffixText.value = ''; });
+      window.showToast('已固化到基础昵称', { type: 'success' });
+    };
+    const clearAll = () => {
+      name.value = ''; category.value = 'none';
+      nextTick(() => {
+        effectId.value = 'none'; suffixText.value = '';
+        atText.value = ''; showInvisible.value = false;
+        kbInput.value = ''; kbShowInvisible.value = true;
+      });
+      window.showToast('已清空所有配置', { type: 'info' });
+    };
+    const resetAll = () => {
+      name.value = '冰上的房子'; category.value = 'bidi';
+      nextTick(() => {
+        effectId.value = 'rlo'; suffixText.value = 'The';
+        atText.value = 'The quick brown fox jumps over the lazy dog 敏捷的棕色狐狸跳过懒狗';
+        showInvisible.value = false;
+      });
+      window.showToast('已重置', { type: 'info' });
+    };
+
+    onMounted(() => {
+      window.addEventListener('app-ready', () => {
+        nextTick(() => {
+          if (lowPerf.value) {
+            document.querySelectorAll('.gsap-init').forEach(el => { el.style.visibility = 'visible'; });
+            if (fabEl.value) fabEl.value.style.opacity = '1';
+            if (primaryBtnRef.value) primaryBtnRef.value.style.opacity = '1';
+            setTimeout(() => {
+              const score = window.__PERF_SCORE__ || 0;
+              window.showToast('已启用轻量模式 · 动画已简化', { type: 'warn' });
+              setTimeout(() => window.showToast('性能系数 ' + score + ' / 100', { type: 'info' }), 400);
+            }, 600);
+            return;
+          }
+          setTimeout(() => {
+            window.showToast('输入 ?debug=true 可强制开启动画', { type: 'info' });
+          }, 900);
+
+          if (isMobile.value) {
+            gsap.set(mobileHeaderEl.value, { visibility: 'visible' });
+            gsap.fromTo(mobileHeaderEl.value, { y: -40, opacity: 0 }, { y: 0, opacity: 1, duration: 0.35, ease: EASE_DECELERATE });
+            gsap.fromTo(mobileLogoEl.value, { scale: 0, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.4, delay: 0.05, ease: EASE_DECELERATE });
+            gsap.fromTo(mobileTitleEl.value, { opacity: 0, x: -8 }, { opacity: 1, x: 0, duration: 0.3, delay: 0.1, ease: EASE_DECELERATE });
+            gsap.fromTo(mobileResetBtn.value, { opacity: 0, scale: 0.5 }, { opacity: 1, scale: 1, duration: 0.3, delay: 0.15, ease: EASE_DECELERATE });
+            staggerChildren(mobileMainEl.value.querySelectorAll('.gsap-init'), 0.2);
+            gsap.set(mobileFooterEl.value, { visibility: 'visible' });
+            gsap.fromTo(mobileFooterEl.value, { y: 40, opacity: 0 }, { y: 0, opacity: 1, duration: 0.35, delay: 0.25, ease: EASE_DECELERATE });
+          } else {
+            gsap.set(desktopAsideEl.value, { visibility: 'visible' });
+            gsap.fromTo(desktopAsideEl.value, { x: -20, opacity: 0 }, { x: 0, opacity: 1, duration: 0.4, ease: EASE_DECELERATE });
+            gsap.fromTo(desktopLogoEl.value, { scale: 0, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.4, delay: 0.08, ease: EASE_DECELERATE });
+            gsap.set(desktopMainEl.value, { visibility: 'visible' });
+            gsap.fromTo(desktopMainEl.value, { x: 20, opacity: 0 }, { x: 0, opacity: 1, duration: 0.4, delay: 0.06, ease: EASE_DECELERATE });
+            staggerChildren([...desktopAsideEl.value.querySelectorAll('.gsap-init'), ...desktopMainEl.value.querySelectorAll('.gsap-init')], 0.22);
+          }
+          gsap.fromTo(fabEl.value, { scale: 0, opacity: 0, rotate: -90 }, { scale: 1, opacity: 1, rotate: 0, duration: 0.45, delay: 0.35, ease: EASE_DECELERATE });
+          if (primaryBtnRef.value) gsap.fromTo(primaryBtnRef.value, { y: 8, opacity: 0 }, { y: 0, opacity: 1, duration: 0.3, delay: 0.5, ease: EASE_DECELERATE });
+        });
+      });
+    });
+
+    return {
+      isMobile, name, category, effectId, suffixText, atText, showInvisible,
+      alertType, alertTag, alertText,
+      keyboardOpen, kbTab, kbInput, kbShowInvisible, kbInputRef,
+      filteredEffects, needsText, displayNickname, hasInvisible, debugSegments,
+      previewOutput, kbDebugSegments, kbAnimStyle, kbScaleStyle, KEY_DATA,
+      lowPerf,
+      mobileHeaderEl, mobileLogoEl, mobileTitleEl, mobileResetBtn, mobileMainEl, mobileFooterEl,
+      desktopAsideEl, desktopMainEl, desktopLogoEl, primaryBtnRef, fabEl, panelEl, maskEl,
+      alertEl, expandEl, badgeEl, badgeEl2, nicknameBoxEl, previewBoxEl,
+      addRipple, toggleKeyboard, handleKey, kbBackspace, kbClear, kbCopy,
+      copyResult, applyResult, clearAll, resetAll,
+      onAlertEnter, onAlertLeave, onExpandEnter, onExpandLeave,
+      onPanelEnter, onPanelLeave, onMaskEnter, onMaskLeave,
+    };
+  }
+}).mount('#app');
+
+/* 加载完成 */
+(function() {
+  const startTime = Date.now();
+  const fill = document.getElementById('loaderFill');
+  const loader = document.getElementById('loader');
+  let progress = 0;
+
+  const tick = () => {
+    const target = progress < 60 ? progress + 14 : progress + 4;
+    progress = Math.min(target, 92);
+    fill.style.width = progress + '%';
+    if (progress < 92) setTimeout(tick, 70);
+  };
+  tick();
+
+  const finish = () => {
+    const elapsed = Date.now() - startTime;
+    const wait = Math.max(0, 1000 - elapsed);
+    setTimeout(() => {
+      fill.style.width = '100%';
+      setTimeout(() => {
+        if (LOW_PERF) {
+          loader.style.transition = 'opacity 0.2s linear';
+          loader.style.opacity = '0';
+          setTimeout(() => {
+            loader.remove();
+            window.dispatchEvent(new CustomEvent('app-ready'));
+          }, 200);
+        } else {
+          gsap.to(loader, { opacity: 0, duration: 0.3, ease: 'power2.out',
+            onComplete: () => {
+              loader.remove();
+              window.dispatchEvent(new CustomEvent('app-ready'));
+            }
+          });
+        }
+      }, 200);
+    }, wait);
+  };
+
+  if (document.readyState === 'complete') finish();
+  else window.addEventListener('load', finish);
+})();
+</script>
+</body>
+</html>

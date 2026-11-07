@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>设备性能检测</title>
+<style>
+  :root {
+    --md-primary: #6750A4;
+    --md-primary-hover: #7F67BE;
+    --md-primary-container: #EADDFF;
+    --md-on-primary-container: #21005D;
+    --md-surface: #FEF7FF;
+    --md-surface-container: #F3EDF7;
+    --md-on-surface: #1D1B20;
+    --md-on-surface-variant: #49454F;
+    --md-outline: #79747E;
+    --md-outline-variant: #CAC4D0;
+    --md-success: #146C2E;
+    --md-warn: #B26A00;
+    --md-gold: #9A6700;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0;
+    min-height: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: var(--md-surface);
+    color: var(--md-on-surface);
+    -webkit-font-smoothing: antialiased;
+  }
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    min-height: 100vh;
+  }
+  .card {
+    width: 100%;
+    max-width: 500px;
+    background: #fff;
+    border-radius: 24px;
+    border: 1px solid var(--md-outline-variant);
+    padding: 28px 24px 24px;
+    box-shadow: 0 1px 2px rgba(0,0,0,.06), 0 8px 24px rgba(0,0,0,.06);
+  }
+  h1 {
+    font-size: 22px;
+    font-weight: 500;
+    margin: 0 0 4px;
+    letter-spacing: -0.2px;
+  }
+  .subtitle {
+    font-size: 12px;
+    color: var(--md-on-surface-variant);
+    margin: 0 0 8px;
+  }
+
+  /* 主分数 */
+  .score-hero {
+    text-align: center;
+    padding: 20px 0 22px;
+  }
+  .score-value {
+    font-size: 76px;
+    font-weight: 500;
+    line-height: 1;
+    letter-spacing: -2px;
+    color: var(--md-primary);
+    font-variant-numeric: tabular-nums;
+    transition: color 0.4s ease, transform 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  .score-value.placeholder { color: var(--md-outline-variant); }
+  .score-value.bump { transform: scale(1.08); }
+  .score-label {
+    font-size: 13px;
+    color: var(--md-on-surface-variant);
+    margin-top: 6px;
+    letter-spacing: 0.3px;
+    min-height: 18px;
+  }
+  .score-badge {
+    display: inline-block;
+    margin-top: 12px;
+    padding: 6px 18px;
+    border-radius: 9999px;
+    font-size: 13px;
+    font-weight: 500;
+    background: var(--md-primary-container);
+    color: var(--md-on-primary-container);
+    transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+    transform: scale(0);
+  }
+  .score-badge.show { transform: scale(1); }
+
+  /* 进度条 */
+  .progress-track {
+    height: 4px;
+    background: var(--md-surface-container);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-bottom: 12px;
+  }
+  .progress-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--md-primary);
+    border-radius: 2px;
+    transition: width 0.3s cubic-bezier(0.4,0,0.2,1);
+  }
+
+  /* 状态 */
+  .status {
+    font-size: 12.5px;
+    color: var(--md-on-surface-variant);
+    margin-bottom: 18px;
+    min-height: 18px;
+    text-align: center;
+    letter-spacing: 0.2px;
+  }
+
+  /* 结果列表 */
+  .results {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 22px;
+    min-height: 200px;
+  }
+  .result-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 13px;
+    opacity: 0;
+    transform: translateY(6px);
+    animation: fade-in 0.35s cubic-bezier(0.1,0.9,0.2,1) forwards;
+  }
+  @keyframes fade-in {
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .result-name {
+    flex: 0 0 82px;
+    color: var(--md-on-surface-variant);
+    font-size: 12.5px;
+  }
+  .result-bar {
+    flex: 1;
+    height: 6px;
+    background: var(--md-surface-container);
+    border-radius: 3px;
+    overflow: hidden;
+    position: relative;
+  }
+  .result-bar-fill {
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 0%;
+    background: var(--md-primary);
+    border-radius: 3px;
+    transition: width 0.6s cubic-bezier(0.1,0.9,0.2,1), background 0.3s;
+  }
+  .result-value {
+    flex: 0 0 72px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    color: var(--md-on-surface);
+    font-weight: 500;
+    font-size: 12.5px;
+  }
+  .result-value .unit {
+    color: var(--md-on-surface-variant);
+    font-weight: 400;
+    font-size: 10.5px;
+    margin-left: 2px;
+  }
+
+  /* 设备信息 */
+  .device-info {
+    padding: 14px 16px;
+    background: var(--md-surface-container);
+    border-radius: 12px;
+    font-size: 12px;
+    line-height: 1.9;
+    color: var(--md-on-surface-variant);
+    margin-bottom: 18px;
+  }
+  .device-info .row {
+    display: flex;
+    gap: 12px;
+  }
+  .device-info .k {
+    flex: 0 0 72px;
+    opacity: 0.72;
+  }
+  .device-info .v {
+    flex: 1;
+    color: var(--md-on-surface);
+    word-break: break-all;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* 按钮 */
+  .actions {
+    display: flex;
+    gap: 8px;
+  }
+  .btn {
+    flex: 1;
+    padding: 13px;
+    border-radius: 9999px;
+    border: none;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s, box-shadow 0.15s, transform 0.1s;
+  }
+  .btn:active { transform: scale(0.98); }
+  .btn-primary {
+    background: var(--md-primary);
+    color: #fff;
+  }
+  .btn-primary:hover:not(:disabled) {
+    background: var(--md-primary-hover);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.15), 0 4px 12px rgba(103,80,164,0.2);
+  }
+  .btn-primary:disabled {
+    background: var(--md-outline-variant);
+    color: rgba(255,255,255,0.7);
+    cursor: not-allowed;
+  }
+
+  /* 底部提示 */
+  .footnote {
+    font-size: 11px;
+    color: var(--md-on-surface-variant);
+    text-align: center;
+    margin-top: 14px;
+    line-height: 1.5;
+    opacity: 0.8;
+  }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <h1>设备性能检测</h1>
+  <p class="subtitle">综合 CPU、GPU、DOM、内存，输出性能系数</p>
+
+  <div class="score-hero">
+    <div class="score-value placeholder" id="score">--</div>
+    <div class="score-label" id="scoreLabel">准备开始</div>
+    <div class="score-badge" id="scoreBadge">—</div>
+  </div>
+
+  <div class="progress-track"><div class="progress-fill" id="progress"></div></div>
+  <div class="status" id="status">正在初始化…</div>
+
+  <div class="results" id="results"></div>
+
+  <div class="device-info" id="deviceInfo"></div>
+
+  <div class="actions">
+    <button class="btn btn-primary" id="startBtn" disabled>测试中…</button>
+  </div>
+
+  <p class="footnote">分数仅为相对性能参考，不代表绝对跑分</p>
+</div>
+
+<script>
+/* ============================================================
+   工具
+   ============================================================ */
+const $ = id => document.getElementById(id);
+const yieldToUI = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
+
+/* ============================================================
+   测试 1：CPU 整数运算
+   ============================================================ */
+function testInt() {
+  const dur = 200;
+  const start = performance.now();
+  let ops = 0, x = 1;
+  while (performance.now() - start < dur) {
+    for (let i = 0; i < 100000; i++) {
+      x = (x * 31 + 17) | 0;
+      x = x ^ (x >>> 13);
+      x = (x * 5 + 3) | 0;
+    }
+    ops += 100000;
+  }
+  const elapsed = performance.now() - start;
+  return (ops / elapsed) * 1000 / 1e6; // M ops/s
+}
+
+/* ============================================================
+   测试 2：CPU 浮点运算
+   ============================================================ */
+function testFloat() {
+  const dur = 200;
+  const start = performance.now();
+  let ops = 0, x = 0.5;
+  while (performance.now() - start < dur) {
+    for (let i = 0; i < 20000; i++) {
+      x = Math.sin(x) + Math.cos(x * 1.1) * Math.sqrt(Math.abs(x) + 0.1);
+    }
+    ops += 20000;
+  }
+  const elapsed = performance.now() - start;
+  return (ops / elapsed) * 1000 / 1e6;
+}
+
+/* ============================================================
+   测试 3：内存吞吐
+   ============================================================ */
+function testMem() {
+  const size = 500000;
+  const arr = new Float64Array(size);
+  const start = performance.now();
+  let iter = 0;
+  while (performance.now() - start < 200) {
+    for (let i = 0; i < size; i++) arr[i] = i * 0.5;
+    let sum = 0;
+    for (let i = 0; i < size; i++) sum += arr[i];
+    iter++;
+  }
+  const elapsed = performance.now() - start;
+  return (size * 2 * iter) / elapsed * 1000 / 1e6;
+}
+
+/* ============================================================
+   测试 4：DOM 操作
+   ============================================================ */
+function testDom() {
+  const container = document.createElement('div');
+  container.style.cssText = 'position:absolute;left:-9999px;top:0;visibility:hidden;';
+  document.body.appendChild(container);
+  const start = performance.now();
+  let ops = 0;
+  const batch = 100;
+  while (performance.now() - start < 200) {
+    for (let i = 0; i < batch; i++) {
+      const el = document.createElement('div');
+      el.textContent = 'x' + i;
+      el.className = 'test';
+      container.appendChild(el);
+    }
+    void container.offsetHeight; // 强制重排
+    container.innerHTML = '';
+    ops += batch;
+  }
+  document.body.removeChild(container);
+  const elapsed = performance.now() - start;
+  return (ops / elapsed) * 1000 / 1000; // K ops/s
+}
+
+/* ============================================================
+   测试 5：Canvas 2D
+   ============================================================ */
+function testCanvas() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 400;
+  canvas.height = 300;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return 0;
+  const start = performance.now();
+  let frames = 0;
+  while (performance.now() - start < 250) {
+    ctx.clearRect(0, 0, 400, 300);
+    for (let i = 0; i < 300; i++) {
+      ctx.fillStyle = `hsl(${i % 360},70%,50%)`;
+      ctx.beginPath();
+      ctx.arc((i * 37) % 400, (i * 53) % 300, (i % 25) + 5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    frames++;
+  }
+  const elapsed = performance.now() - start;
+  return (frames / elapsed) * 1000; // FPS
+}
+
+/* ============================================================
+   测试 6：WebGL
+   ============================================================ */
+function testWebGL() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 400;
+  canvas.height = 300;
+  let gl = null;
+  try {
+    gl = canvas.getContext('webgl', { antialias: false, powerPreference: 'high-performance' })
+      || canvas.getContext('experimental-webgl');
+  } catch (e) { return 0; }
+  if (!gl) return 0;
+
+  try {
+    const vs = gl.createShader(gl.VERTEX_SHADER);
+    gl.shaderSource(vs, 'attribute vec2 p; void main(){gl_Position=vec4(p,0.0,1.0);}');
+    gl.compileShader(vs);
+
+    const fs = gl.createShader(gl.FRAGMENT_SHADER);
+    gl.shaderSource(fs, 'precision mediump float; void main(){gl_FragColor=vec4(1.0,0.5,0.2,1.0);}');
+    gl.compileShader(fs);
+
+    const prog = gl.createProgram();
+    gl.attachShader(prog, vs);
+    gl.attachShader(prog, fs);
+    gl.linkProgram(prog);
+    gl.useProgram(prog);
+
+    const buf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, 0,1]), gl.STATIC_DRAW);
+
+    const loc = gl.getAttribLocation(prog, 'p');
+    gl.enableVertexAttribArray(loc);
+    gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+
+    const start = performance.now();
+    let frames = 0;
+    while (performance.now() - start < 250) {
+      for (let i = 0; i < 20; i++) {
+        gl.clearColor(Math.random(), Math.random(), Math.random(), 1);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+      }
+      gl.finish();
+      frames += 20;
+    }
+    const elapsed = performance.now() - start;
+    return (frames / elapsed) * 1000;
+  } catch (e) {
+    return 0;
+  }
+}
+
+/* ============================================================
+   测试注册表（baseline 参考现代中端设备）
+   ============================================================ */
+const TESTS = [
+  { id: 'int',    name: 'CPU 整数', fn: testInt,    baseline: 80,   unit: 'M ops/s', digits: 1 },
+  { id: 'float',  name: 'CPU 浮点', fn: testFloat,  baseline: 40,   unit: 'M ops/s', digits: 1 },
+  { id: 'mem',    name: '内存吞吐', fn: testMem,    baseline: 1500, unit: 'M ops/s', digits: 0 },
+  { id: 'dom',    name: 'DOM 操作', fn: testDom,    baseline: 40,   unit: 'K ops/s', digits: 1 },
+  { id: 'canvas', name: 'Canvas 2D', fn: testCanvas, baseline: 400, unit: 'FPS',     digits: 0 },
+  { id: 'webgl',  name: 'WebGL',    fn: testWebGL,  baseline: 8000, unit: 'FPS',     digits: 0 },
+];
+
+/* 分数换算：baseline 值 = 50 分，2× baseline = 100 分 */
+function toScore(value, baseline) {
+  if (!value || value <= 0 || !isFinite(value)) return 0;
+  return clamp((value / baseline) * 50, 0, 150);
+}
+
+/* 综合等级 */
+function getLevel(score) {
+  if (score < 20)  return { text: '入门', color: '#B3261E' };
+  if (score < 35)  return { text: '基础', color: '#B26A00' };
+  if (score < 50)  return { text: '中端偏下', color: '#8A6116' };
+  if (score < 65)  return { text: '主流中端', color: '#6750A4' };
+  if (score < 80)  return { text: '中高端', color: '#5B4594' };
+  if (score < 95)  return { text: '高端', color: '#4A3780' };
+  if (score < 115) return { text: '旗舰', color: '#3E2C6B' };
+  return { text: '顶级旗舰', color: '#9A6700' };
+}
+
+/* ============================================================
+   渲染结果行
+   ============================================================ */
+function renderResult(t, value, score, index) {
+  const resultsEl = $('results');
+  const el = document.createElement('div');
+  el.className = 'result-item';
+  el.style.animationDelay = (index * 30) + 'ms';
+
+  const fillPercent = clamp(score / 150 * 100, 2, 100);
+
+  el.innerHTML = `
+    <div class="result-name">${t.name}</div>
+    <div class="result-bar"><div class="result-bar-fill"></div></div>
+    <div class="result-value">
+      ${value.toFixed(t.digits)}<span class="unit">${t.unit}</span>
+    </div>
+  `;
+  resultsEl.appendChild(el);
+  requestAnimationFrame(() => {
+    el.querySelector('.result-bar-fill').style.width = fillPercent + '%';
+  });
+}
+
+/* ============================================================
+   设备信息
+   ============================================================ */
+function collectDeviceInfo() {
+  const ua = navigator.userAgent;
+  let browser = '未知';
+  if (ua.includes('Edg/')) browser = 'Edge';
+  else if (ua.includes('Chrome/') && !ua.includes('Edg')) browser = 'Chrome';
+  else if (ua.includes('Firefox')) browser = 'Firefox';
+  else if (ua.includes('Safari') && !ua.includes('Chrome')) browser = 'Safari';
+
+  let os = '未知';
+  if (/iPhone|iPad|iPod/.test(ua)) os = 'iOS';
+  else if (/Android/.test(ua)) os = 'Android';
+  else if (/Windows/.test(ua)) os = 'Windows';
+  else if (/Mac OS X/.test(ua)) os = 'macOS';
+  else if (/Linux/.test(ua)) os = 'Linux';
+
+  const dpr = window.devicePixelRatio || 1;
+  const screenRes = `${window.screen.width}×${window.screen.height}`;
+  const cores = navigator.hardwareConcurrency || '未知';
+  const mem = navigator.deviceMemory ? navigator.deviceMemory + ' GB' : '未暴露';
+
+  const rows = [
+    ['系统', os],
+    ['浏览器', browser],
+    ['屏幕', screenRes],
+    ['像素比', dpr.toFixed(2) + '×'],
+    ['CPU 核心', cores + ' 核'],
+    ['设备内存', mem],
+  ];
+
+  const infoEl = $('deviceInfo');
+  infoEl.innerHTML = rows.map(([k, v]) =>
+    `<div class="row"><div class="k">${k}</div><div class="v">${v}</div></div>`
+  ).join('');
+}
+
+/* ============================================================
+   主流程
+   ============================================================ */
+async function runAll() {
+  const startBtn = $('startBtn');
+  const scoreEl = $('score');
+  const scoreLabel = $('scoreLabel');
+  const scoreBadge = $('scoreBadge');
+  const progress = $('progress');
+  const status = $('status');
+  const resultsEl = $('results');
+
+  startBtn.disabled = true;
+  startBtn.textContent = '测试中…';
+  scoreEl.textContent = '--';
+  scoreEl.classList.add('placeholder');
+  scoreEl.classList.remove('bump');
+  scoreLabel.textContent = '测试进行中';
+  scoreBadge.classList.remove('show');
+  resultsEl.innerHTML = '';
+  progress.style.width = '0%';
+  await yieldToUI();
+
+  const scores = [];
+
+  for (let i = 0; i < TESTS.length; i++) {
+    const t = TESTS[i];
+    status.textContent = `正在测试：${t.name}（${i + 1}/${TESTS.length}）`;
+    progress.style.width = ((i) / TESTS.length * 100) + '%';
+    await yieldToUI();
+
+    let value = 0;
+    try {
+      value = t.fn();
+    } catch (e) {
+      value = 0;
+    }
+    const s = toScore(value, t.baseline);
+    scores.push(s);
+
+    renderResult(t, value, s, i);
+    progress.style.width = ((i + 1) / TESTS.length * 100) + '%';
+    await yieldToUI();
+  }
+
+  /* 综合分 */
+  const total = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+  const level = getLevel(total);
+
+  await yieldToUI();
+  progress.style.width = '100%';
+  status.textContent = '测试完成';
+
+  scoreEl.classList.remove('placeholder');
+  scoreEl.textContent = total;
+  scoreEl.style.color = level.color;
+  scoreEl.classList.add('bump');
+  setTimeout(() => scoreEl.classList.remove('bump'), 350);
+
+  scoreLabel.textContent = '综合性能系数';
+  scoreBadge.textContent = level.text;
+  scoreBadge.style.color = level.color;
+  scoreBadge.classList.add('show');
+
+  startBtn.disabled = false;
+  startBtn.textContent = '重新测试';
+}
+
+/* ============================================================
+   初始化
+   ============================================================ */
+window.addEventListener('DOMContentLoaded', () => {
+  collectDeviceInfo();
+  $('startBtn').addEventListener('click', runAll);
+  // 自动跑一次
+  setTimeout(runAll, 300);
+});
+</script>
+</body>
+</html>

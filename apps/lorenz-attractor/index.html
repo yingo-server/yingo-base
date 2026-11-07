@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>洛伦兹吸引子</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #000; }
+        canvas { display: block; }
+    </style>
+</head>
+<body>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.min.js"></script>
+    <script>
+        // ========== 可修改参数 ==========
+        const dt = 0.008;               // 时间步长
+        const sigma = 10.0;             // σ 参数
+        const rho = 28.0;               // ρ 参数
+        const beta = 2.667;             // β 参数
+        const trailLength = 200000;       // 轨迹长度（点数）
+        const lineWidth = 1.5;          // 线宽
+        const initialX = 0.0;           // 初始X
+        const initialY = 1.0;           // 初始Y
+        const initialZ = 1.05;          // 初始Z
+        const cameraDistance = 100;      // 相机距离
+        const pointsPerFrame = 6;       // 每帧计算点数
+        // ===============================
+
+        // 场景设置
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({antialias: true});
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+        renderer.setClearColor(0x000000);
+
+        // 创建几何体
+        const geometry = new THREE.BufferGeometry();
+        const positions = new Float32Array(trailLength * 3);
+        const colors = new Float32Array(trailLength * 3);
+        
+        // 初始化位置和颜色
+        for (let i = 0; i < trailLength; i++) {
+            positions[i * 3] = initialX;
+            positions[i * 3 + 1] = initialY;
+            positions[i * 3 + 2] = initialZ;
+            colors[i * 3] = 0.0;
+            colors[i * 3 + 1] = 0.0;
+            colors[i * 3 + 2] = 0.0;
+        }
+        
+        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+        
+        // 创建材质
+        const material = new THREE.LineBasicMaterial({
+            vertexColors: true,
+            linewidth: lineWidth,
+            transparent: true,
+            blending: THREE.AdditiveBlending,
+            depthTest: true,
+            depthWrite: false
+        });
+        
+        const line = new THREE.Line(geometry, material);
+        scene.add(line);
+
+        // 当前点
+        let x = initialX, y = initialY, z = initialZ;
+        let pointArray = []; // 存储点数据
+
+        // 相机位置
+        camera.position.z = cameraDistance;
+        
+        // 添加OrbitControls控制
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.rotateSpeed = 0.5;
+        controls.zoomSpeed = 0.8;
+
+        // 洛伦兹方程
+        function lorenz(x, y, z) {
+            return [
+                sigma * (y - x),
+                x * (rho - z) - y,
+                x * y - beta * z
+            ];
+        }
+
+        // 动画循环
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            // 每帧计算多个点
+            for (let i = 0; i < pointsPerFrame; i++) {
+                const [dx, dy, dz] = lorenz(x, y, z);
+                x += dx * dt;
+                y += dy * dt;
+                z += dz * dt;
+                
+                pointArray.push({x, y, z});
+                
+                // 如果超过轨迹长度，删除最旧的点
+                if (pointArray.length > trailLength) {
+                    pointArray.shift();
+                }
+            }
+            
+            const currentPointCount = pointArray.length;
+            
+            // 更新几何体数据
+            for (let i = 0; i < currentPointCount; i++) {
+                const point = pointArray[i];
+                positions[i * 3] = point.x;
+                positions[i * 3 + 1] = point.y;
+                positions[i * 3 + 2] = point.z;
+                
+                // 颜色计算：最新点最亮，最旧点最暗
+                // 使用当前点在数组中的位置（0最旧，currentPointCount-1最新）来计算亮度
+                const brightness = i / (currentPointCount - 1); // 从0到1，0最暗，1最亮
+                // 将brightness映射到0到1，但我们可以调整曲线，比如使用指数衰减
+                // 这里使用线性，如果需要更自然的淡出可以调整
+                colors[i * 3] = brightness;
+                colors[i * 3 + 1] = brightness;
+                colors[i * 3 + 2] = brightness;
+            }
+            
+            // 清除剩余位置的颜色（设置为透明）
+            for (let i = currentPointCount; i < trailLength; i++) {
+                colors[i * 3] = 0.0;
+                colors[i * 3 + 1] = 0.0;
+                colors[i * 3 + 2] = 0.0;
+            }
+            
+            geometry.setDrawRange(0, currentPointCount);
+            geometry.attributes.position.needsUpdate = true;
+            geometry.attributes.color.needsUpdate = true;
+            
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
+    </script>
+</body>
+</html>

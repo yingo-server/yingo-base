@@ -1,0 +1,1860 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>浏览器特性检测</title>
+
+<script>
+(function () {
+  'use strict';
+  var canRun = true, reasons = [];
+  function check(name, fn) {
+    try { if (!fn()) { canRun = false; reasons.push(name); } }
+    catch (e) { canRun = false; reasons.push(name); }
+  }
+  check('Promise', function () { return typeof Promise !== 'undefined'; });
+  check('Symbol', function () { return typeof Symbol !== 'undefined'; });
+  check('Map', function () { return typeof Map !== 'undefined'; });
+  check('Set', function () { return typeof Set !== 'undefined'; });
+  check('Object.assign', function () { return typeof Object.assign === 'function'; });
+  check('Array.from', function () { return typeof Array.from === 'function'; });
+  check('document.querySelector', function () { return !!document.querySelector; });
+  check('JSON', function () { return typeof JSON !== 'undefined'; });
+  check('Function.prototype.bind', function () { return typeof Function.prototype.bind === 'function'; });
+  check('Element.classList', function () { return typeof document.createElement('div').classList !== 'undefined'; });
+  check('箭头函数', function () { new Function('return (()=>1)()')(); return true; });
+  check('模板字符串', function () { new Function('return `a${1}b`')(); return true; });
+  check('let/const', function () { new Function('let a=1; const b=2; return a+b')(); return true; });
+  check('class 类', function () { new Function('class A{}; return A')(); return true; });
+  check('默认参数', function () { new Function('function f(a=1){return a}; f()')(); return true; });
+
+  window.__BROWSER_TOO_OLD__ = !canRun;
+  window.__TOO_OLD_REASONS__ = reasons;
+
+  if (!canRun) {
+    var ua = navigator.userAgent || '(unknown)';
+    var html = '<!DOCTYPE html><html><head><meta charset="utf-8">' +
+      '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+      '<title>浏览器版本过旧</title></head>' +
+      '<body style="margin:0;padding:40px 20px;font-family:sans-serif;' +
+      'background:#1c1b1f;color:#e8e0ef;text-align:center;min-height:100vh">' +
+      '<div style="max-width:520px;margin:0 auto;padding-top:60px">' +
+      '<div style="font-size:48px;margin-bottom:24px">&#9888;&#65039;</div>' +
+      '<h1 style="font-size:22px;font-weight:500;margin:0 0 16px">浏览器版本过旧</h1>' +
+      '<p style="font-size:14px;line-height:1.9;color:#a098b0;margin:0 0 24px">' +
+      '此检测页面需要 Chrome 51+ / Android 5.0+ WebView 才能运行。</p>' +
+      '<p style="font-size:12px;color:#a098b0;word-break:break-all;line-height:1.8;' +
+      'background:#2a2730;padding:12px;border-radius:12px">' +
+      '缺失项：' + reasons.join('、') + '<br><br>' + ua + '</p>' +
+      '</div></body></html>';
+    document.open();
+    document.write(html);
+    document.close();
+    throw new Error('Browser too old');
+  }
+})();
+</script>
+
+<style>
+  *, *::before, *::after { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0; min-height: 100vh;
+    font-family: 'Roboto', 'Noto Sans SC', system-ui, -apple-system, sans-serif;
+    font-size: 15px; line-height: 1.6; color: #1c1b1f;
+    background: linear-gradient(160deg, #f4f0fa 0%, #e9e2f3 45%, #dcd2ec 100%);
+    background-attachment: fixed;
+  }
+  .container { max-width: 860px; margin: 0 auto; padding: 24px 16px 64px; }
+  .app-bar { text-align: center; padding: 12px 0 24px; }
+  .app-bar h1 { margin: 0; font-size: 26px; font-weight: 600; color: #4a3b7a; }
+  .app-bar p { margin: 6px 0 0; font-size: 13px; color: #6b5f8a; }
+  .card { background: #fff; border-radius: 20px; padding: 22px; margin-bottom: 14px; border: 1px solid #e6dff2; }
+  .card h2 { margin: 0 0 14px; font-size: 16px; font-weight: 600; color: #4a3b7a; }
+  .progress-card { text-align: center; padding: 28px 22px 24px; }
+  .progress-ring { position: relative; width: 160px; height: 160px; margin: 0 auto; }
+  .progress-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); display: block; }
+  .ring-bg { fill: none; stroke: #ece6f6; stroke-width: 8; }
+  .ring-fg { fill: none; stroke: #6750a4; stroke-width: 8; stroke-linecap: round;
+    stroke-dasharray: 314.16; stroke-dashoffset: 314.16;
+    transition: stroke-dashoffset 0.25s ease-out; }
+  .ring-text { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    font-size: 26px; font-weight: 600; color: #4a3b7a; letter-spacing: 0.5px; }
+  .ring-divider { margin: 0 2px; color: #b9aed1; font-weight: 400; font-size: 22px; }
+  #ring-current { color: #6750a4; }
+  .scroll-viewport { height: 84px; margin-top: 20px; overflow: hidden; position: relative;
+    -webkit-mask-image: linear-gradient(180deg, transparent 0%, #000 18%, #000 82%, transparent 100%);
+            mask-image: linear-gradient(180deg, transparent 0%, #000 18%, #000 82%, transparent 100%); }
+  .scroll-track { will-change: transform; }
+  .scroll-item { height: 28px; line-height: 28px; font-size: 13px; color: #79747e;
+    text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    padding: 0 16px; font-family: 'SF Mono', 'Consolas', 'Monaco', monospace; }
+  .scroll-item.active { color: #6750a4; font-weight: 500; }
+  .btn-primary { display: inline-flex; align-items: center; justify-content: center;
+    width: 100%; border: none; border-radius: 100px; padding: 14px 26px;
+    font-size: 14px; font-weight: 600; letter-spacing: 0.3px; cursor: pointer;
+    font-family: inherit; background: #6750a4; color: #fff; margin-bottom: 14px;
+    transition: background 0.15s ease; text-decoration: none; }
+  .btn-primary:hover { background: #5a4690; }
+  .btn-primary:active { background: #4a3b7a; }
+  .btn-primary:disabled, .btn-primary[aria-disabled="true"] { background: #c5bbdd; cursor: not-allowed; }
+  .code-preview { margin: 0; padding: 16px; background: #1c1b1f; color: #d0c8e0;
+    border-radius: 14px; font-family: 'SF Mono', 'Consolas', 'Monaco', monospace;
+    font-size: 11.5px; line-height: 1.6; max-height: 420px; overflow: auto;
+    white-space: pre; -webkit-overflow-scrolling: touch; }
+  .hint { font-size: 13px; color: #6b5f8a; line-height: 1.7; margin: 0 0 14px; }
+  .hint code { background: #ece6f6; padding: 2px 6px; border-radius: 6px; font-size: 12px; color: #6750a4; }
+  .category-title { font-size: 15px; font-weight: 600; color: #4a3b7a;
+    margin: 20px 0 10px; padding-bottom: 8px; border-bottom: 2px solid #ece6f6; }
+  .category-title:first-child { margin-top: 0; }
+  .group-title { font-size: 12px; font-weight: 600; color: #6750a4;
+    margin: 14px 0 6px; letter-spacing: 0.4px; }
+  .item { display: flex; align-items: center; padding: 6px 2px;
+    font-size: 13px; border-bottom: 1px solid #f4f0fa; }
+  .item:last-child { border-bottom: none; }
+  .icon { flex: 0 0 18px; width: 18px; height: 18px; margin-right: 10px;
+    border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: bold; color: #fff; line-height: 1; }
+  .icon.ok { background: #2e7d32; }
+  .icon.no { background: #b3261e; }
+  .icon.warn { background: #ed6c02; }
+  .item-name { flex: 1; color: #1c1b1f; }
+  .item.no .item-name { color: #b3261e; font-weight: 500; }
+  #info-content { font-size: 13px; line-height: 1.85; color: #49454e; word-break: break-all; }
+  #info-content .label { display: inline-block; min-width: 76px; font-weight: 600; color: #6750a4; }
+  .summary-stats { display: flex; gap: 12px; margin-bottom: 16px; }
+  .stat { flex: 1; background: #f6f3fb; border-radius: 16px; padding: 14px 12px; text-align: center; }
+  .stat-value { font-size: 26px; font-weight: 600; line-height: 1.1; color: #6750a4; }
+  .stat-value.missing { color: #b3261e; }
+  .stat-label { margin-top: 4px; font-size: 12px; color: #79747e; letter-spacing: 0.4px; }
+  .filter-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+  .filter-btn { padding: 6px 14px; border-radius: 100px; border: 1px solid #e6dff2;
+    background: #fff; color: #6750a4; font-size: 12px; font-weight: 500;
+    cursor: pointer; font-family: inherit; transition: all 0.15s; }
+  .filter-btn.active { background: #6750a4; color: #fff; border-color: #6750a4; }
+  @media (max-width: 520px) {
+    .app-bar h1 { font-size: 22px; }
+    .progress-ring { width: 140px; height: 140px; }
+    .ring-text { font-size: 22px; }
+    .ring-divider { font-size: 18px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <header class="app-bar">
+    <h1>浏览器特性检测</h1>
+    <p>JS + CSS + Web API + 媒体 + 安全 · 生成统一 Polyfill</p>
+  </header>
+
+  <section class="card progress-card" id="progress-card">
+    <div class="progress-ring">
+      <svg viewBox="0 0 120 120" aria-hidden="true">
+        <circle class="ring-bg" cx="60" cy="60" r="50" />
+        <circle class="ring-fg" id="ring-fg" cx="60" cy="60" r="50" />
+      </svg>
+      <div class="ring-text">
+        <span id="ring-current">0</span>
+        <span class="ring-divider">/</span>
+        <span id="ring-total">0</span>
+      </div>
+    </div>
+    <div class="scroll-viewport">
+      <div class="scroll-track" id="scroll-track"></div>
+    </div>
+  </section>
+
+  <section class="card" id="result-card" style="display:none">
+    <h2>生成的统一脚本</h2>
+    <p class="hint">
+      脚本包含所有检测到的缺失特性。JS 基线 Chrome 51+，CSS 基线 Chrome 79+。
+    </p>
+    <a class="btn-primary" id="download-btn" download="polyfill-unified.user.js" aria-disabled="true">&#11015; 下载统一 Polyfill 脚本 (.user.js)</a>
+    <pre class="code-preview" id="script-preview"></pre>
+  </section>
+
+  <section class="card" id="detail-card" style="display:none">
+    <h2>检测详情</h2>
+    <div class="filter-bar" id="filter-bar">
+      <button class="filter-btn active" data-filter="all">全部</button>
+      <button class="filter-btn" data-filter="api">Web API</button>
+      <button class="filter-btn" data-filter="css">CSS</button>
+      <button class="filter-btn" data-filter="js">JavaScript</button>
+      <button class="filter-btn" data-filter="media">媒体</button>
+      <button class="filter-btn" data-filter="security">安全</button>
+    </div>
+    <div class="summary-stats">
+      <div class="stat">
+        <div class="stat-value" id="supported-count">0</div>
+        <div class="stat-label">已支持</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value missing" id="missing-count">0</div>
+        <div class="stat-label">缺失</div>
+      </div>
+    </div>
+    <div id="results-content"></div>
+  </section>
+
+  <section class="card" id="fingerprint-card" style="display:none">
+    <h2>浏览器指纹</h2>
+    <div id="info-content"></div>
+  </section>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  if (window.__BROWSER_TOO_OLD__) { return; }
+
+  /* ===== CSS.supports 安全降级 ===== */
+  var _supports = (typeof CSS !== 'undefined' && typeof CSS.supports === 'function')
+    ? CSS.supports.bind(CSS)
+    : function (prop, val) {
+        try {
+          if (arguments.length === 1) {
+            var parts = String(arguments[0]).split(':');
+            if (parts.length < 2) return false;
+            prop = parts[0].trim();
+            val = parts.slice(1).join(':').trim();
+          }
+          var el = document.createElement('div');
+          var camel = prop.replace(/-([a-z])/g, function (_, c) { return c.toUpperCase(); });
+          if (camel in el.style) { el.style[camel] = val; return el.style[camel] !== ''; }
+          return false;
+        } catch (e) { return false; }
+      };
+
+  /* ===== 辅助函数 ===== */
+  function sup(prop, val) { return function () { return _supports(prop, val); }; }
+  function sel(s) { return function () { return _supports('selector(' + s + ')'); }; }
+  function mq(q) { return function () { try { return window.matchMedia(q).media !== 'not all'; } catch (e) { return false; } }; }
+  function glob(name) { return function () { return typeof window[name] !== 'undefined'; }; }
+  function proto(ctor, prop) { return function () { try { return typeof window[ctor] !== 'undefined' && prop in window[ctor].prototype; } catch (e) { return false; } }; }
+
+  /* =========================================================
+   *  测试用例定义
+   * ========================================================= */
+  var TEST_GROUPS = [
+
+    /* ========== Web API · 图形与 GPU ========== */
+    { name: 'Web API · 图形与 GPU', category: 'api', items: [
+      ['WebGL', () => { try { const c = document.createElement('canvas'); return !!(c.getContext('webgl') || c.getContext('experimental-webgl')); } catch(e){ return false; } }],
+      ['WebGL2', () => { try { return !!document.createElement('canvas').getContext('webgl2'); } catch(e){ return false; } }],
+      ['WebGPU', () => typeof navigator.gpu !== 'undefined'],
+      ['Canvas 2D', () => { try { return !!document.createElement('canvas').getContext('2d'); } catch(e){ return false; } }],
+      ['OffscreenCanvas', () => typeof OffscreenCanvas !== 'undefined'],
+      ['createImageBitmap', () => typeof createImageBitmap === 'function'],
+      ['Path2D', () => typeof Path2D !== 'undefined'],
+      ['ImageData', () => typeof ImageData !== 'undefined'],
+      ['WebCodecs', () => typeof VideoEncoder !== 'undefined'],
+      ['VideoFrame', () => typeof VideoFrame !== 'undefined'],
+      ['SVG', () => typeof SVGSVGElement !== 'undefined'],
+      ['SVGPathSegList', () => typeof SVGPathSeg !== 'undefined'],
+    ]},
+
+    /* ========== Web API · 媒体与音视频 ========== */
+    { name: 'Web API · 媒体与音视频', category: 'api', items: [
+      ['Web Audio', () => typeof AudioContext !== 'undefined' || typeof webkitAudioContext !== 'undefined'],
+      ['MediaRecorder', () => typeof MediaRecorder !== 'undefined'],
+      ['MediaDevices', () => typeof navigator.mediaDevices !== 'undefined'],
+      ['getUserMedia', () => typeof navigator.mediaDevices?.getUserMedia === 'function'],
+      ['enumerateDevices', () => typeof navigator.mediaDevices?.enumerateDevices === 'function'],
+      ['getDisplayMedia', () => typeof navigator.mediaDevices?.getDisplayMedia === 'function'],
+      ['Picture-in-Picture', () => typeof HTMLVideoElement !== 'undefined' && 'requestPictureInPicture' in HTMLVideoElement.prototype],
+      ['Document PiP', () => typeof documentPictureInPicture !== 'undefined'],
+      ['MediaSource', () => typeof MediaSource !== 'undefined'],
+      ['ManagedMediaSource', () => typeof ManagedMediaSource !== 'undefined'],
+      ['MediaCapabilities', () => typeof navigator.mediaCapabilities !== 'undefined'],
+      ['Remote Playback', () => typeof HTMLMediaElement !== 'undefined' && 'remote' in HTMLMediaElement.prototype],
+      ['SpeechSynthesis', () => typeof speechSynthesis !== 'undefined'],
+      ['SpeechRecognition', () => typeof SpeechRecognition !== 'undefined' || typeof webkitSpeechRecognition !== 'undefined'],
+      ['HTMLMediaElement.play', () => typeof HTMLMediaElement !== 'undefined' && typeof HTMLMediaElement.prototype.play === 'function'],
+      ['canPlayType', () => typeof HTMLVideoElement !== 'undefined' && typeof HTMLVideoElement.prototype.canPlayType === 'function'],
+      ['AudioWorklet', () => typeof AudioWorkletNode !== 'undefined'],
+      ['VideoTrack', () => typeof VideoTrack !== 'undefined'],
+      ['AudioTrack', () => typeof AudioTrack !== 'undefined'],
+    ]},
+
+    /* ========== Web API · 设备与硬件 ========== */
+    { name: 'Web API · 设备与硬件', category: 'api', items: [
+      ['Geolocation', () => typeof navigator.geolocation !== 'undefined'],
+      ['Vibration', () => typeof navigator.vibrate === 'function'],
+      ['Battery', () => typeof navigator.getBattery === 'function'],
+      ['Gamepad', () => typeof navigator.getGamepads === 'function'],
+      ['DeviceOrientation', () => typeof DeviceOrientationEvent !== 'undefined'],
+      ['DeviceMotion', () => typeof DeviceMotionEvent !== 'undefined'],
+      ['Bluetooth', () => typeof navigator.bluetooth !== 'undefined'],
+      ['USB', () => typeof navigator.usb !== 'undefined'],
+      ['Serial', () => typeof navigator.serial !== 'undefined'],
+      ['NFC', () => typeof NDEFReader !== 'undefined'],
+      ['HID', () => typeof navigator.hid !== 'undefined'],
+      ['ScreenOrientation', () => typeof screen.orientation !== 'undefined'],
+      ['Screen Wake Lock', () => typeof navigator.wakeLock !== 'undefined'],
+      ['Fullscreen', () => typeof document.documentElement.requestFullscreen === 'function'],
+      ['PointerLock', () => typeof document.documentElement.requestPointerLock === 'function'],
+      ['Presentation', () => typeof PresentationRequest !== 'undefined'],
+      ['PaymentRequest', () => typeof PaymentRequest !== 'undefined'],
+      ['Web Share', () => typeof navigator.share === 'function'],
+      ['Idle Detection', () => typeof IdleDetector !== 'undefined'],
+      ['AmbientLightSensor', () => typeof AmbientLightSensor !== 'undefined'],
+      ['ProximitySensor', () => typeof ProximitySensor !== 'undefined'],
+    ]},
+
+    /* ========== Web API · 网络与通信 ========== */
+    { name: 'Web API · 网络与通信', category: 'api', items: [
+      ['XMLHttpRequest', () => typeof XMLHttpRequest !== 'undefined'],
+      ['fetch', () => typeof fetch === 'function'],
+      ['Beacon', () => typeof navigator.sendBeacon === 'function'],
+      ['WebSocket', () => typeof WebSocket !== 'undefined'],
+      ['EventSource', () => typeof EventSource !== 'undefined'],
+      ['BroadcastChannel', () => typeof BroadcastChannel !== 'undefined'],
+      ['MessageChannel', () => typeof MessageChannel !== 'undefined'],
+      ['WebTransport', () => typeof WebTransport !== 'undefined'],
+      ['NetworkInformation', () => typeof navigator.connection !== 'undefined'],
+      ['Online/Offline', () => 'onLine' in navigator],
+      ['Push API', () => 'PushManager' in window],
+      ['WebRTC', () => typeof RTCPeerConnection !== 'undefined'],
+      ['RTCDataChannel', () => typeof RTCDataChannel !== 'undefined'],
+      ['URL', () => typeof URL === 'function'],
+      ['URLSearchParams', () => typeof URLSearchParams === 'function'],
+      ['URL.createObjectURL', () => typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function'],
+      ['Blob', () => typeof Blob === 'function'],
+      ['File', () => typeof File === 'function'],
+      ['FileReader', () => typeof FileReader === 'function'],
+      ['TextEncoder', () => typeof TextEncoder === 'function'],
+      ['TextDecoder', () => typeof TextDecoder === 'function'],
+      ['FormData', () => typeof FormData === 'function'],
+      ['Headers', () => typeof Headers === 'function'],
+      ['Request', () => typeof Request === 'function'],
+      ['Response', () => typeof Response === 'function'],
+      ['ReadableStream', () => typeof ReadableStream !== 'undefined'],
+      ['WritableStream', () => typeof WritableStream !== 'undefined'],
+      ['TransformStream', () => typeof TransformStream !== 'undefined'],
+    ]},
+
+    /* ========== Web API · 存储与数据 ========== */
+    { name: 'Web API · 存储与数据', category: 'api', items: [
+      ['localStorage', () => { try { return typeof localStorage !== 'undefined'; } catch(e){ return false; } }],
+      ['sessionStorage', () => { try { return typeof sessionStorage !== 'undefined'; } catch(e){ return false; } }],
+      ['IndexedDB', () => typeof indexedDB !== 'undefined'],
+      ['CacheStorage', () => typeof caches !== 'undefined'],
+      ['FileSystemAccess', () => typeof showOpenFilePicker === 'function'],
+      ['StorageManager', () => typeof navigator.storage !== 'undefined'],
+      ['Storage.estimate', () => typeof navigator.storage?.estimate === 'function'],
+      ['Storage.persist', () => typeof navigator.storage?.persist === 'function'],
+      ['CookieStore', () => typeof cookieStore !== 'undefined'],
+      ['FileSystemHandle', () => typeof FileSystemHandle !== 'undefined'],
+      ['FileSystemDirectoryHandle', () => typeof FileSystemDirectoryHandle !== 'undefined'],
+    ]},
+
+    /* ========== Web API · 观察者与性能 ========== */
+    { name: 'Web API · 观察者与性能', category: 'api', items: [
+      ['MutationObserver', () => typeof MutationObserver !== 'undefined'],
+      ['IntersectionObserver', () => typeof IntersectionObserver !== 'undefined'],
+      ['ResizeObserver', () => typeof ResizeObserver !== 'undefined'],
+      ['PerformanceObserver', () => typeof PerformanceObserver !== 'undefined'],
+      ['ReportingObserver', () => typeof ReportingObserver !== 'undefined'],
+      ['Performance.now', () => typeof performance !== 'undefined' && typeof performance.now === 'function'],
+      ['Performance.mark', () => typeof performance !== 'undefined' && typeof performance.mark === 'function'],
+      ['Performance.measure', () => typeof performance !== 'undefined' && typeof performance.measure === 'function'],
+      ['PerformanceNavigationTiming', () => typeof PerformanceNavigationTiming !== 'undefined'],
+      ['PerformanceResourceTiming', () => typeof PerformanceResourceTiming !== 'undefined'],
+      ['Long Tasks API', () => typeof PerformanceLongTaskTiming !== 'undefined'],
+      ['Element Timing', () => typeof PerformanceElementTiming !== 'undefined'],
+      ['Layout Instability', () => typeof LayoutShift !== 'undefined'],
+    ]},
+
+    /* ========== Web API · Worker 与并发 ========== */
+    { name: 'Web API · Worker 与并发', category: 'api', items: [
+      ['Worker', () => typeof Worker !== 'undefined'],
+      ['SharedWorker', () => typeof SharedWorker !== 'undefined'],
+      ['ServiceWorker', () => 'serviceWorker' in navigator],
+      ['ServiceWorker.register', () => typeof navigator.serviceWorker?.register === 'function'],
+      ['Worklet', () => typeof Worklet !== 'undefined'],
+      ['AudioWorklet', () => typeof AudioWorkletNode !== 'undefined'],
+      ['Web Locks', () => typeof navigator.locks !== 'undefined'],
+      ['Scheduler', () => typeof scheduler !== 'undefined'],
+      ['TaskController', () => typeof TaskController !== 'undefined'],
+    ]},
+
+    /* ========== Web API · DOM 与 Element ========== */
+    { name: 'Web API · DOM 与 Element', category: 'api', items: [
+      ['querySelector', () => typeof document.querySelector === 'function'],
+      ['querySelectorAll', () => typeof document.querySelectorAll === 'function'],
+      ['getElementById', () => typeof document.getElementById === 'function'],
+      ['Element.classList', () => typeof document.createElement('div').classList !== 'undefined'],
+      ['Element.dataset', () => typeof document.createElement('div').dataset !== 'undefined'],
+      ['Element.matches', () => typeof Element !== 'undefined' && typeof Element.prototype.matches === 'function'],
+      ['Element.closest', () => typeof Element !== 'undefined' && typeof Element.prototype.closest === 'function'],
+      ['Element.remove', () => typeof Element !== 'undefined' && typeof Element.prototype.remove === 'function'],
+      ['Element.append', () => typeof Element !== 'undefined' && typeof Element.prototype.append === 'function'],
+      ['Element.prepend', () => typeof Element !== 'undefined' && typeof Element.prototype.prepend === 'function'],
+      ['Element.animate', () => typeof Element !== 'undefined' && typeof Element.prototype.animate === 'function'],
+      ['Element.attachShadow', () => typeof Element !== 'undefined' && typeof Element.prototype.attachShadow === 'function'],
+      ['Element.getBoundingClientRect', () => typeof Element !== 'undefined' && typeof Element.prototype.getBoundingClientRect === 'function'],
+      ['Element.scrollIntoView', () => typeof Element !== 'undefined' && typeof Element.prototype.scrollIntoView === 'function'],
+      ['Element.toggleAttribute', () => typeof Element !== 'undefined' && typeof Element.prototype.toggleAttribute === 'function'],
+      ['Element.insertAdjacentElement', () => typeof Element !== 'undefined' && typeof Element.prototype.insertAdjacentElement === 'function'],
+      ['Element.computedStyleMap', () => typeof Element !== 'undefined' && typeof Element.prototype.computedStyleMap === 'function'],
+      ['Element.attributeStyleMap', () => typeof Element !== 'undefined' && typeof Element.prototype.attributeStyleMap !== 'undefined'],
+      ['Document.visibilityState', () => 'visibilityState' in document],
+      ['Document.fullscreenElement', () => 'fullscreenElement' in document],
+      ['Document.pointerLockElement', () => 'pointerLockElement' in document],
+      ['Document.adoptedStyleSheets', () => 'adoptedStyleSheets' in document],
+      ['Document.startViewTransition', () => typeof document.startViewTransition === 'function'],
+      ['CustomElementRegistry', () => typeof customElements !== 'undefined'],
+      ['HTMLTemplateElement', () => typeof HTMLTemplateElement !== 'undefined'],
+      ['HTMLDialogElement', () => typeof HTMLDialogElement !== 'undefined'],
+      ['HTMLDetailsElement', () => typeof HTMLDetailsElement !== 'undefined'],
+      ['HTMLSlotElement', () => typeof HTMLSlotElement !== 'undefined'],
+      ['ShadowRoot', () => typeof ShadowRoot !== 'undefined'],
+      ['NodeList.forEach', () => typeof NodeList !== 'undefined' && typeof NodeList.prototype.forEach === 'function'],
+      ['DOMParser', () => typeof DOMParser !== 'undefined'],
+      ['XMLSerializer', () => typeof XMLSerializer !== 'undefined'],
+      ['DOMRect', () => typeof DOMRect !== 'undefined'],
+      ['DOMTokenList', () => typeof DOMTokenList !== 'undefined'],
+      ['AbortController', () => typeof AbortController !== 'undefined'],
+      ['AbortSignal.timeout', () => typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function'],
+      ['AbortSignal.abort', () => typeof AbortSignal !== 'undefined' && typeof AbortSignal.abort === 'function'],
+      ['structuredClone', () => typeof structuredClone === 'function'],
+      ['queueMicrotask', () => typeof queueMicrotask === 'function'],
+      ['requestAnimationFrame', () => typeof requestAnimationFrame === 'function'],
+      ['CustomEvent', () => typeof CustomEvent === 'function'],
+      ['matchMedia', () => typeof window.matchMedia === 'function'],
+      ['CSS.supports', () => typeof CSS !== 'undefined' && typeof CSS.supports === 'function'],
+    ]},
+
+    /* ========== Web API · 事件系统 ========== */
+    { name: 'Web API · 事件系统', category: 'api', items: [
+      ['addEventListener options', () => { try { document.createElement('div').addEventListener('x', null, { once: true }); return true; } catch(e){ return false; } }],
+      ['Passive Event Listeners', () => { try { document.createElement('div').addEventListener('x', null, { passive: true }); return true; } catch(e){ return false; } }],
+      ['PointerEvent', () => typeof PointerEvent !== 'undefined'],
+      ['TouchEvent', () => typeof TouchEvent !== 'undefined'],
+      ['WheelEvent', () => typeof WheelEvent !== 'undefined'],
+      ['KeyboardEvent.code', () => typeof KeyboardEvent !== 'undefined' && 'code' in KeyboardEvent.prototype],
+      ['KeyboardEvent.key', () => typeof KeyboardEvent !== 'undefined' && 'key' in KeyboardEvent.prototype],
+      ['KeyboardEvent.location', () => typeof KeyboardEvent !== 'undefined' && 'location' in KeyboardEvent.prototype],
+      ['KeyboardEvent.getModifierState', () => typeof KeyboardEvent !== 'undefined' && typeof KeyboardEvent.prototype.getModifierState === 'function'],
+      ['InputEvent', () => typeof InputEvent !== 'undefined'],
+      ['ClipboardEvent', () => typeof ClipboardEvent !== 'undefined'],
+      ['DragEvent', () => typeof DragEvent !== 'undefined'],
+      ['AnimationEvent', () => typeof AnimationEvent !== 'undefined'],
+      ['TransitionEvent', () => typeof TransitionEvent !== 'undefined'],
+      ['Event.composedPath', () => typeof Event !== 'undefined' && typeof Event.prototype.composedPath === 'function'],
+      ['Event.composed', () => typeof Event !== 'undefined' && 'composed' in Event.prototype],
+      ['CustomEvent.detail', () => typeof CustomEvent !== 'undefined' && 'detail' in CustomEvent.prototype],
+      ['FocusEvent.relatedTarget', () => typeof FocusEvent !== 'undefined' && 'relatedTarget' in FocusEvent.prototype],
+    ]},
+
+    /* ========== Web API · 国际化 ========== */
+    { name: 'Web API · 国际化', category: 'api', items: [
+      ['Intl', () => typeof Intl === 'object'],
+      ['Intl.DateTimeFormat', () => typeof Intl !== 'undefined' && typeof Intl.DateTimeFormat === 'function'],
+      ['Intl.NumberFormat', () => typeof Intl !== 'undefined' && typeof Intl.NumberFormat === 'function'],
+      ['Intl.NumberFormat compact', () => { try { return new Intl.NumberFormat('en', { notation: 'compact' }).format(1500) === '1.5K'; } catch(e){ return false; } }],
+      ['Intl.RelativeTimeFormat', () => typeof Intl !== 'undefined' && typeof Intl.RelativeTimeFormat === 'function'],
+      ['Intl.ListFormat', () => typeof Intl !== 'undefined' && typeof Intl.ListFormat === 'function'],
+      ['Intl.PluralRules', () => typeof Intl !== 'undefined' && typeof Intl.PluralRules === 'function'],
+      ['Intl.DisplayNames', () => typeof Intl !== 'undefined' && typeof Intl.DisplayNames === 'function'],
+      ['Intl.Segmenter', () => typeof Intl !== 'undefined' && typeof Intl.Segmenter === 'function'],
+      ['Intl.Locale', () => typeof Intl !== 'undefined' && typeof Intl.Locale === 'function'],
+      ['Intl.Collator', () => typeof Intl !== 'undefined' && typeof Intl.Collator === 'function'],
+      ['Intl.supportedValuesOf', () => typeof Intl !== 'undefined' && typeof Intl.supportedValuesOf === 'function'],
+      ['navigator.languages', () => typeof navigator.languages !== 'undefined'],
+    ]},
+
+    /* ========== 安全与认证 ========== */
+    { name: 'Web API · 安全与认证', category: 'security', items: [
+      ['Secure Context', () => window.isSecureContext === true],
+      ['Cross-Origin Isolated', () => window.crossOriginIsolated === true],
+      ['CSP', () => { try { return typeof SecurityPolicyViolationEvent !== 'undefined'; } catch(e){ return false; } }],
+      ['Trusted Types', () => typeof trustedTypes !== 'undefined'],
+      ['Web Authentication', () => typeof PublicKeyCredential !== 'undefined'],
+      ['Credential Management', () => typeof navigator.credentials !== 'undefined'],
+      ['Permissions API', () => typeof navigator.permissions !== 'undefined'],
+      ['Permissions.query', () => typeof navigator.permissions?.query === 'function'],
+      ['SRI', () => typeof document.createElement('link').integrity !== 'undefined'],
+      ['Referrer Policy', () => 'referrerPolicy' in document.createElement('img')],
+      ['Feature Policy', () => typeof document.featurePolicy !== 'undefined'],
+      ['Crypto.randomUUID', () => typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'],
+      ['Crypto.getRandomValues', () => typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function'],
+      ['Crypto.subtle', () => typeof crypto !== 'undefined' && typeof crypto.subtle !== 'undefined'],
+      ['Password Credential', () => typeof PasswordCredential !== 'undefined'],
+      ['Federated Credential', () => typeof FederatedCredential !== 'undefined'],
+    ]},
+
+    /* ========== JavaScript · ES5 ========== */
+    { name: 'ES5 (2009)', category: 'js', items: [
+      ['Array.prototype.forEach', () => typeof Array.prototype.forEach === 'function'],
+      ['Array.prototype.map', () => typeof Array.prototype.map === 'function'],
+      ['Array.prototype.filter', () => typeof Array.prototype.filter === 'function'],
+      ['Array.prototype.reduce', () => typeof Array.prototype.reduce === 'function'],
+      ['Array.prototype.some', () => typeof Array.prototype.some === 'function'],
+      ['Array.prototype.every', () => typeof Array.prototype.every === 'function'],
+      ['Array.prototype.indexOf', () => typeof Array.prototype.indexOf === 'function'],
+      ['Array.prototype.lastIndexOf', () => typeof Array.prototype.lastIndexOf === 'function'],
+      ['Array.isArray', () => typeof Array.isArray === 'function'],
+      ['Object.keys', () => typeof Object.keys === 'function'],
+      ['Object.create', () => typeof Object.create === 'function'],
+      ['Object.defineProperty', () => typeof Object.defineProperty === 'function'],
+      ['Object.getPrototypeOf', () => typeof Object.getPrototypeOf === 'function'],
+      ['Object.getOwnPropertyNames', () => typeof Object.getOwnPropertyNames === 'function'],
+      ['Object.freeze', () => typeof Object.freeze === 'function'],
+      ['Object.seal', () => typeof Object.seal === 'function'],
+      ['Object.preventExtensions', () => typeof Object.preventExtensions === 'function'],
+      ['Object.isFrozen', () => typeof Object.isFrozen === 'function'],
+      ['Object.isSealed', () => typeof Object.isSealed === 'function'],
+      ['Object.isExtensible', () => typeof Object.isExtensible === 'function'],
+      ['Function.prototype.bind', () => typeof Function.prototype.bind === 'function'],
+      ['JSON.parse', () => typeof JSON.parse === 'function'],
+      ['JSON.stringify', () => typeof JSON.stringify === 'function'],
+      ['String.prototype.trim', () => typeof String.prototype.trim === 'function'],
+      ['Date.now', () => typeof Date.now === 'function'],
+      ['严格模式', () => { try { new Function('"use strict"; return 1')(); return true; } catch (e) { return false; } }],
+      ['getter / setter', () => { try { new Function('var o={get x(){return 1}}; return o.x')(); return true; } catch (e) { return false; } }],
+    ]},
+
+    /* ========== JavaScript · ES6 / ES2015 ========== */
+    { name: 'ES6 / ES2015', category: 'js', items: [
+      ['Promise', () => typeof Promise === 'function'],
+      ['Symbol', () => typeof Symbol === 'function'],
+      ['Symbol.iterator', () => typeof Symbol === 'function' && typeof Symbol.iterator === 'symbol'],
+      ['Symbol.asyncIterator', () => typeof Symbol === 'function' && typeof Symbol.asyncIterator === 'symbol'],
+      ['Symbol.hasInstance', () => typeof Symbol === 'function' && typeof Symbol.hasInstance === 'symbol'],
+      ['Symbol.toPrimitive', () => typeof Symbol === 'function' && typeof Symbol.toPrimitive === 'symbol'],
+      ['Symbol.toStringTag', () => typeof Symbol === 'function' && typeof Symbol.toStringTag === 'symbol'],
+      ['Symbol.for', () => typeof Symbol === 'function' && typeof Symbol.for === 'function'],
+      ['Map', () => typeof Map === 'function'],
+      ['Set', () => typeof Set === 'function'],
+      ['WeakMap', () => typeof WeakMap === 'function'],
+      ['WeakSet', () => typeof WeakSet === 'function'],
+      ['Proxy', () => typeof Proxy === 'function'],
+      ['Reflect', () => typeof Reflect === 'object'],
+      ['Array.from', () => typeof Array.from === 'function'],
+      ['Array.of', () => typeof Array.of === 'function'],
+      ['Array.prototype.find', () => typeof Array.prototype.find === 'function'],
+      ['Array.prototype.findIndex', () => typeof Array.prototype.findIndex === 'function'],
+      ['Array.prototype.fill', () => typeof Array.prototype.fill === 'function'],
+      ['Array.prototype.copyWithin', () => typeof Array.prototype.copyWithin === 'function'],
+      ['Array.prototype.entries', () => typeof Array.prototype.entries === 'function'],
+      ['Array.prototype.keys', () => typeof Array.prototype.keys === 'function'],
+      ['Array.prototype.values', () => typeof Array.prototype.values === 'function'],
+      ['Object.assign', () => typeof Object.assign === 'function'],
+      ['Object.is', () => typeof Object.is === 'function'],
+      ['Object.setPrototypeOf', () => typeof Object.setPrototypeOf === 'function'],
+      ['Object.getOwnPropertySymbols', () => typeof Object.getOwnPropertySymbols === 'function'],
+      ['String.prototype.includes', () => typeof String.prototype.includes === 'function'],
+      ['String.prototype.startsWith', () => typeof String.prototype.startsWith === 'function'],
+      ['String.prototype.endsWith', () => typeof String.prototype.endsWith === 'function'],
+      ['String.prototype.repeat', () => typeof String.prototype.repeat === 'function'],
+      ['String.prototype.codePointAt', () => typeof String.prototype.codePointAt === 'function'],
+      ['String.fromCodePoint', () => typeof String.fromCodePoint === 'function'],
+      ['String.raw', () => typeof String.raw === 'function'],
+      ['Number.isInteger', () => typeof Number.isInteger === 'function'],
+      ['Number.isNaN', () => typeof Number.isNaN === 'function'],
+      ['Number.isFinite', () => typeof Number.isFinite === 'function'],
+      ['Number.isSafeInteger', () => typeof Number.isSafeInteger === 'function'],
+      ['Number.EPSILON', () => typeof Number.EPSILON === 'number'],
+      ['Number.MAX_SAFE_INTEGER', () => typeof Number.MAX_SAFE_INTEGER === 'number'],
+      ['Number.parseInt', () => typeof Number.parseInt === 'function'],
+      ['Math.trunc', () => typeof Math.trunc === 'function'],
+      ['Math.sign', () => typeof Math.sign === 'function'],
+      ['Math.cbrt', () => typeof Math.cbrt === 'function'],
+      ['Math.log2', () => typeof Math.log2 === 'function'],
+      ['Math.log10', () => typeof Math.log10 === 'function'],
+      ['Math.hypot', () => typeof Math.hypot === 'function'],
+      ['箭头函数', () => { try { new Function('return (()=>1)()')(); return true; } catch (e) { return false; } }],
+      ['let / const', () => { try { new Function('let a=1; const b=2; return a+b')(); return true; } catch (e) { return false; } }],
+      ['模板字符串', () => { try { new Function('return `a${1}b`')(); return true; } catch (e) { return false; } }],
+      ['class 类', () => { try { new Function('class A{}; return A')(); return true; } catch (e) { return false; } }],
+      ['默认参数', () => { try { new Function('function f(a=1){return a}; f()')(); return true; } catch (e) { return false; } }],
+      ['剩余参数', () => { try { new Function('function f(...a){return a}; f()')(); return true; } catch (e) { return false; } }],
+      ['展开运算符', () => { try { new Function('return [...[1,2],3]')(); return true; } catch (e) { return false; } }],
+      ['解构赋值', () => { try { new Function('const [a,b]=[1,2]; return a+b')(); return true; } catch (e) { return false; } }],
+      ['for...of 循环', () => { try { new Function('for (const x of [1]) {}; return 1')(); return true; } catch (e) { return false; } }],
+      ['生成器 function*', () => { try { new Function('function* g(){yield 1}; g()')(); return true; } catch (e) { return false; } }],
+      ['计算属性名', () => { try { new Function('const k="a"; return {[k]:1}')(); return true; } catch (e) { return false; } }],
+      ['对象方法简写', () => { try { new Function('return {a(){}}')(); return true; } catch (e) { return false; } }],
+      ['RegExp.prototype.flags', () => typeof new RegExp().flags === 'string'],
+      ['RegExp sticky 标志', () => { try { return new RegExp('a', 'y').sticky === true; } catch(e){ return false; } }],
+      ['RegExp unicode 标志', () => { try { return new RegExp('a', 'u').unicode === true; } catch(e){ return false; } }],
+      ['TypedArray', () => typeof Int8Array !== 'undefined'],
+      ['Uint8Array', () => typeof Uint8Array !== 'undefined'],
+      ['Float32Array', () => typeof Float32Array !== 'undefined'],
+      ['ArrayBuffer', () => typeof ArrayBuffer !== 'undefined'],
+      ['DataView', () => typeof DataView !== 'undefined'],
+    ]},
+
+    /* ========== JavaScript · ES2016 ~ ES2025 ========== */
+    { name: 'ES2016 ~ ES2025', category: 'js', items: [
+      ['Array.prototype.includes', () => typeof Array.prototype.includes === 'function'],
+      ['指数运算符 **', () => { try { new Function('return 2**3')(); return true; } catch (e) { return false; } }],
+      ['async / await', () => { try { new Function('return async function(){await 1}')(); return true; } catch (e) { return false; } }],
+      ['Object.values', () => typeof Object.values === 'function'],
+      ['Object.entries', () => typeof Object.entries === 'function'],
+      ['Object.getOwnPropertyDescriptors', () => typeof Object.getOwnPropertyDescriptors === 'function'],
+      ['String.prototype.padStart', () => typeof String.prototype.padStart === 'function'],
+      ['String.prototype.padEnd', () => typeof String.prototype.padEnd === 'function'],
+      ['SharedArrayBuffer', () => typeof SharedArrayBuffer === 'function'],
+      ['Atomics', () => typeof Atomics === 'object'],
+      ['Atomics.wait', () => typeof Atomics !== 'undefined' && typeof Atomics.wait === 'function'],
+      ['for await...of', () => { try { new Function('async function f(){for await (const x of []){}}; f()')(); return true; } catch (e) { return false; } }],
+      ['对象 rest/spread', () => { try { new Function('const {a,...b}={a:1,b:2}; return b')(); return true; } catch (e) { return false; } }],
+      ['Promise.prototype.finally', () => typeof Promise !== 'undefined' && typeof Promise.prototype.finally === 'function'],
+      ['正则命名捕获组', () => { try { new Function('return /(?<a>x)/')(); return true; } catch (e) { return false; } }],
+      ['正则后行断言', () => { try { new Function('return /(?<=x)y/')(); return true; } catch (e) { return false; } }],
+      ['正则 dotAll 标志 /s', () => { try { new Function('return /./s')(); return true; } catch (e) { return false; } }],
+      ['正则 Unicode 属性', () => { try { new Function('return /\\p{L}/u')(); return true; } catch (e) { return false; } }],
+      ['Array.prototype.flat', () => typeof Array.prototype.flat === 'function'],
+      ['Array.prototype.flatMap', () => typeof Array.prototype.flatMap === 'function'],
+      ['Object.fromEntries', () => typeof Object.fromEntries === 'function'],
+      ['String.prototype.trimStart', () => typeof String.prototype.trimStart === 'function'],
+      ['String.prototype.trimEnd', () => typeof String.prototype.trimEnd === 'function'],
+      ['Symbol.prototype.description', () => typeof Symbol === 'function' && 'description' in Symbol('x')],
+      ['可选 catch 绑定', () => { try { new Function('try{}catch{}')(); return true; } catch (e) { return false; } }],
+      ['JSON 超集', () => { try { new Function('return JSON.parse("\\u2028")')(); return true; } catch (e) { return false; } }],
+      ['Array.prototype.sort 稳定性', () => { try { const arr=[{k:1,v:'a'},{k:1,v:'b'},{k:0,v:'c'}]; arr.sort((a,b)=>a.k-b.k); return arr[0].v==='c'&&arr[1].v==='a'&&arr[2].v==='b'; } catch(e){ return false; } }],
+      ['BigInt', () => typeof BigInt === 'function'],
+      ['BigInt.asIntN', () => typeof BigInt === 'function' && typeof BigInt.asIntN === 'function'],
+      ['BigInt64Array', () => typeof BigInt64Array !== 'undefined'],
+      ['可选链 ?.', () => { try { new Function('var a={}; return a?.b')(); return true; } catch (e) { return false; } }],
+      ['空值合并 ??', () => { try { new Function('return null ?? 1')(); return true; } catch (e) { return false; } }],
+      ['Promise.allSettled', () => typeof Promise !== 'undefined' && typeof Promise.allSettled === 'function'],
+      ['globalThis', () => typeof globalThis !== 'undefined'],
+      ['String.prototype.matchAll', () => typeof String.prototype.matchAll === 'function'],
+      ['String.prototype.replaceAll', () => typeof String.prototype.replaceAll === 'function'],
+      ['Promise.any', () => typeof Promise !== 'undefined' && typeof Promise.any === 'function'],
+      ['AggregateError', () => typeof AggregateError === 'function'],
+      ['WeakRef', () => typeof WeakRef === 'function'],
+      ['WeakRef.prototype.deref', () => typeof WeakRef === 'function' && typeof WeakRef.prototype.deref === 'function'],
+      ['FinalizationRegistry', () => typeof FinalizationRegistry === 'function'],
+      ['逻辑赋值 ||= &&= ??=', () => { try { new Function('var a; a ||= 1; a &&= 2; a ??= 3; return a')(); return true; } catch (e) { return false; } }],
+      ['数字分隔符 1_000', () => { try { new Function('return 1_000')(); return true; } catch (e) { return false; } }],
+      ['Array.prototype.at', () => typeof Array.prototype.at === 'function'],
+      ['String.prototype.at', () => typeof String.prototype.at === 'function'],
+      ['Object.hasOwn', () => typeof Object.hasOwn === 'function'],
+      ['Error.cause', () => { try { new Function('return new Error("x",{cause:1}).cause')(); return true; } catch (e) { return false; } }],
+      ['类字段', () => { try { new Function('class A { x = 1 } return new A().x')(); return true; } catch (e) { return false; } }],
+      ['静态类块', () => { try { new Function('class A { static { this.x = 1 } } return A.x')(); return true; } catch (e) { return false; } }],
+      ['私有字段 #x', () => { try { new Function('class A { #x = 1; get(){ return this.#x } } return new A().get()')(); return true; } catch (e) { return false; } }],
+      ['正则 d 标志', () => { try { new Function('return /a/d')(); return true; } catch (e) { return false; } }],
+      ['Array.prototype.findLast', () => typeof Array.prototype.findLast === 'function'],
+      ['Array.prototype.findLastIndex', () => typeof Array.prototype.findLastIndex === 'function'],
+      ['Array.prototype.toReversed', () => typeof Array.prototype.toReversed === 'function'],
+      ['Array.prototype.toSorted', () => typeof Array.prototype.toSorted === 'function'],
+      ['Array.prototype.toSpliced', () => typeof Array.prototype.toSpliced === 'function'],
+      ['Array.prototype.with', () => typeof Array.prototype.with === 'function'],
+      ['Hashbang 语法', () => { try { new Function('#!x\nreturn 1')(); return true; } catch (e) { return false; } }],
+      ['Object.groupBy', () => typeof Object.groupBy === 'function'],
+      ['Map.groupBy', () => typeof Map.groupBy === 'function'],
+      ['Promise.withResolvers', () => typeof Promise !== 'undefined' && typeof Promise.withResolvers === 'function'],
+      ['String.prototype.isWellFormed', () => typeof String.prototype.isWellFormed === 'function'],
+      ['String.prototype.toWellFormed', () => typeof String.prototype.toWellFormed === 'function'],
+      ['正则 v 标志', () => { try { new Function('return /a/v')(); return true; } catch (e) { return false; } }],
+      ['ArrayBuffer.prototype.transfer', () => typeof ArrayBuffer !== 'undefined' && typeof ArrayBuffer.prototype.transfer === 'function'],
+      ['Set.prototype.union', () => typeof Set !== 'undefined' && typeof Set.prototype.union === 'function'],
+      ['Set.prototype.intersection', () => typeof Set !== 'undefined' && typeof Set.prototype.intersection === 'function'],
+      ['Set.prototype.difference', () => typeof Set !== 'undefined' && typeof Set.prototype.difference === 'function'],
+      ['Set.prototype.symmetricDifference', () => typeof Set !== 'undefined' && typeof Set.prototype.symmetricDifference === 'function'],
+      ['Set.prototype.isSubsetOf', () => typeof Set !== 'undefined' && typeof Set.prototype.isSubsetOf === 'function'],
+      ['Set.prototype.isSupersetOf', () => typeof Set !== 'undefined' && typeof Set.prototype.isSupersetOf === 'function'],
+      ['Set.prototype.isDisjointFrom', () => typeof Set !== 'undefined' && typeof Set.prototype.isDisjointFrom === 'function'],
+      ['Iterator.from', () => typeof Iterator !== 'undefined' && typeof Iterator.from === 'function'],
+      ['Iterator.prototype.map', () => typeof Iterator !== 'undefined' && typeof Iterator.prototype.map === 'function'],
+      ['Promise.try', () => typeof Promise !== 'undefined' && typeof Promise.try === 'function'],
+      ['RegExp.escape', () => typeof RegExp !== 'undefined' && typeof RegExp.escape === 'function'],
+      ['Temporal', () => typeof Temporal !== 'undefined'],
+      ['Temporal.PlainDate', () => typeof Temporal !== 'undefined' && typeof Temporal.PlainDate === 'function'],
+      ['ES Modules', () => { try { return 'noModule' in document.createElement('script'); } catch(e){ return false; } }],
+      ['WebAssembly', () => typeof WebAssembly === 'object'],
+      ['WebAssembly.instantiate', () => typeof WebAssembly !== 'undefined' && typeof WebAssembly.instantiate === 'function'],
+      ['WebAssembly.compileStreaming', () => typeof WebAssembly !== 'undefined' && typeof WebAssembly.compileStreaming === 'function'],
+    ]},
+
+    /* ========== CSS 属性 · Grid ========== */
+    { name: 'CSS 属性 · Grid', category: 'css', items: [
+      ['CSS display: grid', sup('display', 'grid')],
+      ['CSS grid-template-columns', sup('grid-template-columns', '1fr 1fr')],
+      ['CSS grid-template-rows', sup('grid-template-rows', '1fr 1fr')],
+      ['CSS grid-template-areas', sup('grid-template-areas', '"a b"')],
+      ['CSS grid-auto-columns', sup('grid-auto-columns', '1fr')],
+      ['CSS grid-auto-rows', sup('grid-auto-rows', '1fr')],
+      ['CSS grid-auto-flow', sup('grid-auto-flow', 'row dense')],
+      ['CSS grid-column', sup('grid-column', '1 / 2')],
+      ['CSS grid-row', sup('grid-row', '1 / 2')],
+      ['CSS grid-area', sup('grid-area', '1 / 1 / 2 / 2')],
+      ['CSS grid-column-gap', sup('grid-column-gap', '1px')],
+      ['CSS grid-row-gap', sup('grid-row-gap', '1px')],
+      ['CSS grid-gap', sup('grid-gap', '1px')],
+      ['CSS grid (shorthand)', sup('grid', 'auto / auto')],
+      ['CSS grid-template (shorthand)', sup('grid-template', '1fr / 1fr')],
+      ['CSS subgrid', sup('grid-template-columns', 'subgrid')],
+      ['CSS justify-items', sup('justify-items', 'center')],
+      ['CSS justify-self', sup('justify-self', 'center')],
+      ['CSS place-items', sup('place-items', 'center')],
+      ['CSS place-content', sup('place-content', 'center')],
+      ['CSS place-self', sup('place-self', 'center')],
+      ['CSS repeat()', sup('grid-template-columns', 'repeat(2, 1fr)')],
+      ['CSS minmax()', sup('grid-template-columns', 'minmax(1px, 2fr)')],
+      ['CSS fit-content()', sup('grid-template-columns', 'fit-content(100px)')],
+    ]},
+
+    /* ========== CSS 属性 · Flexbox ========== */
+    { name: 'CSS 属性 · Flexbox', category: 'css', items: [
+      ['CSS display: flex', sup('display', 'flex')],
+      ['CSS display: inline-flex', sup('display', 'inline-flex')],
+      ['CSS flex-direction', sup('flex-direction', 'row-reverse')],
+      ['CSS flex-wrap', sup('flex-wrap', 'wrap-reverse')],
+      ['CSS flex-flow', sup('flex-flow', 'row wrap')],
+      ['CSS flex-grow', sup('flex-grow', '1')],
+      ['CSS flex-shrink', sup('flex-shrink', '0')],
+      ['CSS flex-basis', sup('flex-basis', 'auto')],
+      ['CSS flex (shorthand)', sup('flex', '1 0 auto')],
+      ['CSS order', sup('order', '1')],
+      ['CSS align-self', sup('align-self', 'center')],
+      ['CSS align-items', sup('align-items', 'baseline')],
+      ['CSS align-content', sup('align-content', 'space-between')],
+      ['CSS justify-content', sup('justify-content', 'space-evenly')],
+      ['CSS justify-content: safe center', sup('justify-content', 'safe center')],
+      ['CSS gap (flex)', () => { try { const d=document.createElement('div'); d.style.cssText='display:flex;gap:10px;position:absolute;left:-9999px'; d.innerHTML='<span>a</span><span>b</span>'; document.body.appendChild(d); const r=d.children[0].getBoundingClientRect(); const r2=d.children[1].getBoundingClientRect(); const g=r2.left-r.right; document.body.removeChild(d); return g>0; } catch(e){ return false; } }],
+    ]},
+
+    /* ========== CSS 属性 · 逻辑属性 ========== */
+    { name: 'CSS 属性 · 逻辑属性', category: 'css', items: [
+      ['CSS margin-inline', sup('margin-inline', '1px')],
+      ['CSS margin-block', sup('margin-block', '1px')],
+      ['CSS margin-inline-start', sup('margin-inline-start', '1px')],
+      ['CSS margin-block-start', sup('margin-block-start', '1px')],
+      ['CSS padding-inline', sup('padding-inline', '1px')],
+      ['CSS padding-block', sup('padding-block', '1px')],
+      ['CSS padding-inline-start', sup('padding-inline-start', '1px')],
+      ['CSS padding-block-start', sup('padding-block-start', '1px')],
+      ['CSS inset-inline', sup('inset-inline', '1px')],
+      ['CSS inset-block', sup('inset-block', '1px')],
+      ['CSS inset (shorthand)', sup('inset', '0')],
+      ['CSS border-inline', sup('border-inline', '1px solid')],
+      ['CSS border-block', sup('border-block', '1px solid')],
+      ['CSS border-start-start-radius', sup('border-start-start-radius', '1px')],
+      ['CSS border-start-end-radius', sup('border-start-end-radius', '1px')],
+      ['CSS border-end-start-radius', sup('border-end-start-radius', '1px')],
+      ['CSS border-end-end-radius', sup('border-end-end-radius', '1px')],
+      ['CSS inline-size', sup('inline-size', '100px')],
+      ['CSS block-size', sup('block-size', '100px')],
+      ['CSS min-inline-size', sup('min-inline-size', '0')],
+      ['CSS max-inline-size', sup('max-inline-size', '100%')],
+      ['CSS min-block-size', sup('min-block-size', '0')],
+      ['CSS max-block-size', sup('max-block-size', '100%')],
+      ['CSS float: inline-start', sup('float', 'inline-start')],
+      ['CSS text-align: start', sup('text-align', 'start')],
+      ['CSS text-align: end', sup('text-align', 'end')],
+      ['CSS resize (logical)', sup('resize', 'block')],
+      ['CSS overflow-block', sup('overflow-block', 'scroll')],
+      ['CSS overflow-inline', sup('overflow-inline', 'scroll')],
+      ['CSS overscroll-behavior-block', sup('overscroll-behavior-block', 'none')],
+      ['CSS overscroll-behavior-inline', sup('overscroll-behavior-inline', 'none')],
+    ]},
+
+    /* ========== CSS 属性 · 通用 ========== */
+    { name: 'CSS 属性 · 通用', category: 'css', items: [
+      ['CSS position: fixed', sup('position', 'fixed')],
+      ['CSS position: sticky', sup('position', 'sticky')],
+      ['CSS position: absolute', sup('position', 'absolute')],
+      ['CSS z-index', sup('z-index', '1')],
+      ['CSS aspect-ratio', sup('aspect-ratio', '1 / 1')],
+      ['CSS object-fit', sup('object-fit', 'cover')],
+      ['CSS object-position', sup('object-position', 'center')],
+      ['CSS object-view-box', sup('object-view-box', 'inset(10%)')],
+      ['CSS display: contents', sup('display', 'contents')],
+      ['CSS display: inline-block', sup('display', 'inline-block')],
+      ['CSS display: table', sup('display', 'table')],
+      ['CSS overflow: clip', sup('overflow', 'clip')],
+      ['CSS overflow-x', sup('overflow-x', 'auto')],
+      ['CSS overflow-y', sup('overflow-y', 'auto')],
+      ['CSS overscroll-behavior', sup('overscroll-behavior', 'none')],
+      ['CSS isolation', sup('isolation', 'isolate')],
+      ['CSS contain', sup('contain', 'layout')],
+      ['CSS content-visibility', sup('content-visibility', 'auto')],
+      ['CSS contain-intrinsic-size', sup('contain-intrinsic-size', '1px')],
+      ['CSS column-count', sup('column-count', '2')],
+      ['CSS column-width', sup('column-width', '100px')],
+      ['CSS column-gap', sup('column-gap', '1px')],
+      ['CSS column-rule', sup('column-rule', '1px solid')],
+      ['CSS column-span', sup('column-span', 'all')],
+      ['CSS column-fill', sup('column-fill', 'balance')],
+      ['CSS columns (shorthand)', sup('columns', '2')],
+      ['CSS break-inside', sup('break-inside', 'avoid')],
+      ['CSS break-before', sup('break-before', 'page')],
+      ['CSS break-after', sup('break-after', 'page')],
+      ['CSS writing-mode', sup('writing-mode', 'vertical-rl')],
+      ['CSS direction', sup('direction', 'rtl')],
+      ['CSS width: min-content', sup('width', 'min-content')],
+      ['CSS width: max-content', sup('width', 'max-content')],
+      ['CSS width: fit-content', sup('width', 'fit-content')],
+      ['CSS width: stretch', sup('width', 'stretch')],
+      ['CSS min-width', sup('min-width', '0')],
+      ['CSS max-width', sup('max-width', '100%')],
+      ['CSS min-height', sup('min-height', '0')],
+      ['CSS max-height', sup('max-height', '100%')],
+      ['CSS box-sizing: border-box', sup('box-sizing', 'border-box')],
+      ['CSS border-radius', sup('border-radius', '1px')],
+      ['CSS border-image', sup('border-image', 'url(x) 1')],
+      ['CSS border-collapse', sup('border-collapse', 'collapse')],
+      ['CSS border-spacing', sup('border-spacing', '1px')],
+      ['CSS table-layout', sup('table-layout', 'fixed')],
+      ['CSS caption-side', sup('caption-side', 'bottom')],
+      ['CSS empty-cells', sup('empty-cells', 'hide')],
+      ['CSS box-shadow', sup('box-shadow', '0 0 1px red')],
+      ['CSS outline-offset', sup('outline-offset', '1px')],
+      ['CSS outline-style', sup('outline-style', 'dashed')],
+      ['CSS background-clip', sup('background-clip', 'text')],
+      ['CSS background-origin', sup('background-origin', 'content-box')],
+      ['CSS background-attachment', sup('background-attachment', 'fixed')],
+      ['CSS background-size', sup('background-size', 'cover')],
+      ['CSS background-repeat', sup('background-repeat', 'space')],
+      ['CSS background-blend-mode', sup('background-blend-mode', 'multiply')],
+      ['CSS mix-blend-mode', sup('mix-blend-mode', 'multiply')],
+      ['CSS filter', sup('filter', 'blur(1px)')],
+      ['CSS backdrop-filter', sup('backdrop-filter', 'blur(1px)')],
+      ['CSS transform', sup('transform', 'translate3d(1px,2px,3px)')],
+      ['CSS transform-origin', sup('transform-origin', 'center')],
+      ['CSS transform-style', sup('transform-style', 'preserve-3d')],
+      ['CSS transform-box', sup('transform-box', 'fill-box')],
+      ['CSS perspective', sup('perspective', '100px')],
+      ['CSS perspective-origin', sup('perspective-origin', 'center')],
+      ['CSS backface-visibility', sup('backface-visibility', 'hidden')],
+      ['CSS will-change', sup('will-change', 'transform')],
+      ['CSS rotate (独立属性)', sup('rotate', '45deg')],
+      ['CSS scale (独立属性)', sup('scale', '1.5')],
+      ['CSS translate (独立属性)', sup('translate', '10px 20px')],
+      ['CSS transition', sup('transition', 'all 1s')],
+      ['CSS animation', sup('animation', 'a 1s')],
+      ['CSS animation-timeline', sup('animation-timeline', 'scroll()')],
+      ['CSS clip-path', sup('clip-path', 'circle(50%)')],
+      ['CSS mask', sup('mask', 'url(mask.svg)')],
+      ['CSS mask-image', sup('mask-image', 'url(x)')],
+      ['CSS mask-mode', sup('mask-mode', 'luminance')],
+      ['CSS mask-composite', sup('mask-composite', 'add')],
+      ['CSS shape-outside', sup('shape-outside', 'circle(50%)')],
+      ['CSS shape-margin', sup('shape-margin', '1px')],
+      ['CSS shape-image-threshold', sup('shape-image-threshold', '0.5')],
+      ['CSS offset-path', sup('offset-path', 'path("M0,0")')],
+      ['CSS offset-distance', sup('offset-distance', '50%')],
+      ['CSS scroll-behavior', sup('scroll-behavior', 'smooth')],
+      ['CSS scroll-snap-type', sup('scroll-snap-type', 'x mandatory')],
+      ['CSS scroll-snap-align', sup('scroll-snap-align', 'start')],
+      ['CSS scroll-snap-stop', sup('scroll-snap-stop', 'always')],
+      ['CSS scroll-margin', sup('scroll-margin', '1px')],
+      ['CSS scroll-padding', sup('scroll-padding', '1px')],
+      ['CSS scrollbar-width', sup('scrollbar-width', 'thin')],
+      ['CSS scrollbar-color', sup('scrollbar-color', 'red blue')],
+      ['CSS scrollbar-gutter', sup('scrollbar-gutter', 'stable')],
+      ['CSS touch-action', sup('touch-action', 'none')],
+      ['CSS user-select', sup('user-select', 'none')],
+      ['CSS pointer-events', sup('pointer-events', 'none')],
+      ['CSS cursor: pointer', sup('cursor', 'pointer')],
+      ['CSS cursor: grab', sup('cursor', 'grab')],
+      ['CSS cursor: zoom-in', sup('cursor', 'zoom-in')],
+      ['CSS caret-color', sup('caret-color', 'red')],
+      ['CSS accent-color', sup('accent-color', 'red')],
+      ['CSS color-scheme', sup('color-scheme', 'dark')],
+      ['CSS appearance', sup('appearance', 'none')],
+      ['CSS content', sup('content', '"a"')],
+      ['CSS counter-reset', sup('counter-reset', 'c 1')],
+      ['CSS counter-increment', sup('counter-increment', 'c 1')],
+      ['CSS counter-set', sup('counter-set', 'c 1')],
+      ['CSS quotes', sup('quotes', '"«" "»"')],
+      ['CSS list-style-type', sup('list-style-type', 'square')],
+      ['CSS list-style-type: <string>', sup('list-style-type', '"→"')],
+      ['CSS list-style-position', sup('list-style-position', 'inside')],
+      ['CSS list-style-image', sup('list-style-image', 'url(x)')],
+      ['CSS all: unset', sup('all', 'unset')],
+      ['CSS forced-color-adjust', sup('forced-color-adjust', 'none')],
+      ['CSS print-color-adjust', sup('print-color-adjust', 'exact')],
+    ]},
+
+    /* ========== CSS 属性 · 排版与字体 ========== */
+    { name: 'CSS 属性 · 排版与字体', category: 'css', items: [
+      ['CSS font', sup('font', '12px sans-serif')],
+      ['CSS font-family', sup('font-family', 'sans-serif')],
+      ['CSS font-size', sup('font-size', '12px')],
+      ['CSS font-weight', sup('font-weight', '700')],
+      ['CSS font-style', sup('font-style', 'italic')],
+      ['CSS font-variant', sup('font-variant', 'small-caps')],
+      ['CSS font-stretch', sup('font-stretch', 'condensed')],
+      ['CSS font-display', sup('font-display', 'swap')],
+      ['CSS font-kerning', sup('font-kerning', 'normal')],
+      ['CSS font-synthesis', sup('font-synthesis', 'none')],
+      ['CSS font-variation-settings', sup('font-variation-settings', '"wght" 400')],
+      ['CSS font-feature-settings', sup('font-feature-settings', '"liga" 1')],
+      ['CSS font-variant-numeric', sup('font-variant-numeric', 'tabular-nums')],
+      ['CSS font-variant-ligatures', sup('font-variant-ligatures', 'common-ligatures')],
+      ['CSS font-optical-sizing', sup('font-optical-sizing', 'auto')],
+      ['CSS font-size-adjust', sup('font-size-adjust', '0.5')],
+      ['CSS font-palette', sup('font-palette', 'dark')],
+      ['CSS text-indent', sup('text-indent', '1em')],
+      ['CSS text-overflow', sup('text-overflow', 'ellipsis')],
+      ['CSS text-shadow', sup('text-shadow', '0 0 1px red')],
+      ['CSS text-align-last', sup('text-align-last', 'center')],
+      ['CSS text-justify', sup('text-justify', 'inter-word')],
+      ['CSS text-decoration-thickness', sup('text-decoration-thickness', '1px')],
+      ['CSS text-decoration-style', sup('text-decoration-style', 'wavy')],
+      ['CSS text-decoration-color', sup('text-decoration-color', 'red')],
+      ['CSS text-decoration-skip-ink', sup('text-decoration-skip-ink', 'none')],
+      ['CSS text-underline-offset', sup('text-underline-offset', '1px')],
+      ['CSS text-underline-position', sup('text-underline-position', 'under')],
+      ['CSS text-emphasis', sup('text-emphasis', 'dot')],
+      ['CSS text-orientation', sup('text-orientation', 'upright')],
+      ['CSS text-combine-upright', sup('text-combine-upright', 'all')],
+      ['CSS text-wrap: balance', sup('text-wrap', 'balance')],
+      ['CSS text-wrap: pretty', sup('text-wrap', 'pretty')],
+      ['CSS text-size-adjust', sup('text-size-adjust', 'none')],
+      ['CSS letter-spacing', sup('letter-spacing', '1px')],
+      ['CSS word-spacing', sup('word-spacing', '1px')],
+      ['CSS white-space', sup('white-space', 'pre-wrap')],
+      ['CSS white-space: break-spaces', sup('white-space', 'break-spaces')],
+      ['CSS tab-size', sup('tab-size', '4')],
+      ['CSS word-break', sup('word-break', 'break-all')],
+      ['CSS line-break', sup('line-break', 'strict')],
+      ['CSS overflow-wrap', sup('overflow-wrap', 'anywhere')],
+      ['CSS hyphens', sup('hyphens', 'auto')],
+      ['CSS line-clamp', sup('line-clamp', '2')],
+      ['CSS -webkit-line-clamp', sup('-webkit-line-clamp', '2')],
+      ['CSS -webkit-text-fill-color', sup('-webkit-text-fill-color', 'red')],
+      ['CSS -webkit-text-stroke', sup('-webkit-text-stroke', '1px red')],
+      ['CSS initial-letter', sup('initial-letter', '2')],
+      ['CSS hanging-punctuation', sup('hanging-punctuation', 'first')],
+      ['CSS ruby-align', sup('ruby-align', 'center')],
+      ['CSS ruby-position', sup('ruby-position', 'over')],
+      ['CSS vertical-align', sup('vertical-align', 'middle')],
+      ['CSS line-height', sup('line-height', '1.5')],
+    ]},
+
+    /* ========== CSS 值函数 · 数学 ========== */
+    { name: 'CSS 值函数 · 数学', category: 'css', items: [
+      ['CSS calc()', sup('width', 'calc(1px + 1px)')],
+      ['CSS calc() nested', sup('width', 'calc(calc(1px + 1px) * 2)')],
+      ['CSS var()', sup('width', 'var(--x)')],
+      ['CSS var() fallback', sup('width', 'var(--x, 1px)')],
+      ['CSS env()', sup('width', 'env(safe-area-inset-left)')],
+      ['CSS env() fallback', sup('width', 'env(safe-area-inset-left, 1px)')],
+      ['CSS min()', sup('width', 'min(1px, 2px)')],
+      ['CSS max()', sup('width', 'max(1px, 2px)')],
+      ['CSS clamp()', sup('width', 'clamp(1px, 2px, 3px)')],
+      ['CSS min() with calc()', sup('width', 'min(calc(1px + 1px), 3px)')],
+      ['CSS round()', sup('width', 'round(1.5px, 1px)')],
+      ['CSS mod()', sup('width', 'mod(5px, 3px)')],
+      ['CSS rem()', sup('width', 'rem(5px, 3px)')],
+      ['CSS sin()', sup('width', 'calc(sin(45deg) * 1px)')],
+      ['CSS cos()', sup('width', 'calc(cos(45deg) * 1px)')],
+      ['CSS tan()', sup('width', 'calc(tan(45deg) * 1px)')],
+      ['CSS asin()', sup('width', 'calc(asin(0.5) * 1px)')],
+      ['CSS acos()', sup('width', 'calc(acos(0.5) * 1px)')],
+      ['CSS atan()', sup('width', 'calc(atan(1) * 1px)')],
+      ['CSS atan2()', sup('width', 'calc(atan2(1, 1) * 1px)')],
+      ['CSS pow()', sup('width', 'calc(pow(2, 3) * 1px)')],
+      ['CSS sqrt()', sup('width', 'calc(sqrt(4) * 1px)')],
+      ['CSS hypot()', sup('width', 'calc(hypot(3, 4) * 1px)')],
+      ['CSS log()', sup('width', 'calc(log(8, 2) * 1px)')],
+      ['CSS exp()', sup('width', 'calc(exp(1) * 1px)')],
+      ['CSS abs()', sup('width', 'abs(-5px)')],
+      ['CSS sign()', sup('width', 'calc(sign(-5) * 1px)')],
+    ]},
+
+    /* ========== CSS 值函数 · 变换 ========== */
+    { name: 'CSS 值函数 · 变换', category: 'css', items: [
+      ['CSS translate()', sup('transform', 'translate(1px, 2px)')],
+      ['CSS translateX()', sup('transform', 'translateX(1px)')],
+      ['CSS translateY()', sup('transform', 'translateY(1px)')],
+      ['CSS translateZ()', sup('transform', 'translateZ(1px)')],
+      ['CSS translate3d()', sup('transform', 'translate3d(1px, 2px, 3px)')],
+      ['CSS rotate()', sup('transform', 'rotate(45deg)')],
+      ['CSS rotateX()', sup('transform', 'rotateX(45deg)')],
+      ['CSS rotateY()', sup('transform', 'rotateY(45deg)')],
+      ['CSS rotateZ()', sup('transform', 'rotateZ(45deg)')],
+      ['CSS rotate3d()', sup('transform', 'rotate3d(1, 1, 1, 45deg)')],
+      ['CSS scale()', sup('transform', 'scale(1.5)')],
+      ['CSS scaleX()', sup('transform', 'scaleX(1.5)')],
+      ['CSS scaleY()', sup('transform', 'scaleY(1.5)')],
+      ['CSS scale3d()', sup('transform', 'scale3d(1.5, 1.5, 1.5)')],
+      ['CSS skew()', sup('transform', 'skew(45deg, 45deg)')],
+      ['CSS skewX()', sup('transform', 'skewX(45deg)')],
+      ['CSS skewY()', sup('transform', 'skewY(45deg)')],
+      ['CSS matrix()', sup('transform', 'matrix(1, 0, 0, 1, 0, 0)')],
+      ['CSS matrix3d()', sup('transform', 'matrix3d(1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1)')],
+      ['CSS perspective()', sup('transform', 'perspective(100px)')],
+    ]},
+
+    /* ========== CSS 值函数 · 滤镜 ========== */
+    { name: 'CSS 值函数 · 滤镜', category: 'css', items: [
+      ['CSS blur()', sup('filter', 'blur(1px)')],
+      ['CSS brightness()', sup('filter', 'brightness(0.5)')],
+      ['CSS contrast()', sup('filter', 'contrast(0.5)')],
+      ['CSS drop-shadow()', sup('filter', 'drop-shadow(0 0 1px red)')],
+      ['CSS grayscale()', sup('filter', 'grayscale(1)')],
+      ['CSS hue-rotate()', sup('filter', 'hue-rotate(90deg)')],
+      ['CSS invert()', sup('filter', 'invert(1)')],
+      ['CSS opacity()', sup('filter', 'opacity(0.5)')],
+      ['CSS saturate()', sup('filter', 'saturate(0.5)')],
+      ['CSS sepia()', sup('filter', 'sepia(1)')],
+      ['CSS url() filter', sup('filter', 'url(filter.svg)')],
+    ]},
+
+    /* ========== CSS 值函数 · 颜色 ========== */
+    { name: 'CSS 值函数 · 颜色', category: 'css', items: [
+      ['CSS rgb()', sup('color', 'rgb(255 0 0)')],
+      ['CSS rgba()', sup('color', 'rgba(0 0 0 / 0.5)')],
+      ['CSS hsl()', sup('color', 'hsl(0 100% 50%)')],
+      ['CSS hsla()', sup('color', 'hsla(0 100% 50% / 0.5)')],
+      ['CSS hwb()', sup('color', 'hwb(0 0% 0%)')],
+      ['CSS lab()', sup('color', 'lab(50% 0 0)')],
+      ['CSS lch()', sup('color', 'lch(50% 0 0)')],
+      ['CSS oklab()', sup('color', 'oklab(50% 0 0)')],
+      ['CSS oklch()', sup('color', 'oklch(50% 0 0)')],
+      ['CSS color() 函数', sup('color', 'color(srgb 1 0 0)')],
+      ['CSS color-mix()', sup('color', 'color-mix(in lch, white, black)')],
+      ['CSS 相对颜色', sup('color', 'rgb(from red r g b / 1%)')],
+      ['CSS light-dark()', sup('color', 'light-dark(red, blue)')],
+      ['CSS device-cmyk()', sup('color', 'device-cmyk(0 1 0 0)')],
+      ['CSS linear-gradient()', sup('background', 'linear-gradient(red, blue)')],
+      ['CSS radial-gradient()', sup('background', 'radial-gradient(red, blue)')],
+      ['CSS conic-gradient()', sup('background', 'conic-gradient(red, blue)')],
+      ['CSS repeating-linear-gradient()', sup('background', 'repeating-linear-gradient(red, blue 10px)')],
+      ['CSS repeating-radial-gradient()', sup('background', 'repeating-radial-gradient(red, blue 10px)')],
+      ['CSS repeating-conic-gradient()', sup('background', 'repeating-conic-gradient(red, blue 10deg)')],
+    ]},
+
+    /* ========== CSS 值函数 · 形状 ========== */
+    { name: 'CSS 值函数 · 形状', category: 'css', items: [
+      ['CSS circle()', sup('clip-path', 'circle(50%)')],
+      ['CSS ellipse()', sup('clip-path', 'ellipse(50% 50%)')],
+      ['CSS inset()', sup('clip-path', 'inset(10%)')],
+      ['CSS polygon()', sup('clip-path', 'polygon(0 0, 100% 0, 100% 100%)')],
+      ['CSS path()', sup('clip-path', 'path("M0,0 L100,100")')],
+      ['CSS rect()', sup('clip-path', 'rect(0, 100%, 100%, 0)')],
+      ['CSS xywh()', sup('clip-path', 'xywh(0 0 100% 100%)')],
+      ['CSS shape()', sup('clip-path', 'shape(from 0 0, line to 100% 100%)')],
+    ]},
+
+    /* ========== CSS 值函数 · 图像 ========== */
+    { name: 'CSS 值函数 · 图像', category: 'css', items: [
+      ['CSS image()', sup('background', 'image("a.png")')],
+      ['CSS image-set()', sup('background', 'image-set("a.png" 1x)')],
+      ['CSS cross-fade()', sup('background', 'cross-fade(url(a.png), url(b.png), 50%)')],
+      ['CSS element()', sup('background', 'element(#a)')],
+      ['CSS paint()', sup('background', 'paint(myPainter)')],
+    ]},
+
+    /* ========== CSS 值函数 · 缓动 ========== */
+    { name: 'CSS 值函数 · 缓动', category: 'css', items: [
+      ['CSS cubic-bezier()', sup('animation-timing-function', 'cubic-bezier(0.1, 0.7, 1, 0.1)')],
+      ['CSS steps()', sup('animation-timing-function', 'steps(4, end)')],
+      ['CSS linear()', sup('animation-timing-function', 'linear(0, 1)')],
+      ['CSS scroll()', sup('animation-timeline', 'scroll()')],
+      ['CSS view()', sup('animation-timeline', 'view()')],
+    ]},
+
+    /* ========== CSS 值函数 · 其他 ========== */
+    { name: 'CSS 值函数 · 其他', category: 'css', items: [
+      ['CSS attr()', sup('content', 'attr(data-x)')],
+      ['CSS attr() typed', sup('content', 'attr(data-x type(<number>))')],
+      ['CSS counter()', sup('content', 'counter(c)')],
+      ['CSS counters()', sup('content', 'counters(c, ".")')],
+      ['CSS symbols()', sup('list-style-type', 'symbols(cyclic "a")')],
+      ['CSS toggle()', sup('white-space', 'toggle(nowrap)')],
+    ]},
+
+    /* ========== CSS 选择器 · 属性 ========== */
+    { name: 'CSS 选择器 · 属性', category: 'css', items: [
+      ['CSS [attr]', sel('[disabled]')],
+      ['CSS [attr=value]', sel('[type="text"]')],
+      ['CSS [attr~=value]', sel('[class~="a"]')],
+      ['CSS [attr|=value]', sel('[lang|="en"]')],
+      ['CSS [attr^=value]', sel('[href^="https"]')],
+      ['CSS [attr$=value]', sel('[href$=".pdf"]')],
+      ['CSS [attr*=value]', sel('[href*="example"]')],
+      ['CSS [attr=value i]', sel('[type="TEXT" i]')],
+      ['CSS [attr=value s]', sel('[type="TEXT" s]')],
+    ]},
+
+    /* ========== CSS 选择器 · 组合器 ========== */
+    { name: 'CSS 选择器 · 组合器', category: 'css', items: [
+      ['CSS 后代组合器', sel('div p')],
+      ['CSS 子组合器 >', sel('div > p')],
+      ['CSS 相邻兄弟组合器 +', sel('div + p')],
+      ['CSS 通用兄弟组合器 ~', sel('div ~ p')],
+      ['CSS 列组合器 ||', sel('col || td')],
+      ['CSS 嵌套选择器 &', sel('& a')],
+    ]},
+
+    /* ========== CSS 伪类 ========== */
+    { name: 'CSS 伪类', category: 'css', items: [
+      ['CSS :root', sel(':root')],
+      ['CSS :empty', sel(':empty')],
+      ['CSS :nth-child()', sel(':nth-child(2)')],
+      ['CSS :nth-child(An+B of S)', sel(':nth-child(2 of .a)')],
+      ['CSS :nth-last-child()', sel(':nth-last-child(2)')],
+      ['CSS :first-child', sel(':first-child')],
+      ['CSS :last-child', sel(':last-child')],
+      ['CSS :only-child', sel(':only-child')],
+      ['CSS :nth-of-type()', sel(':nth-of-type(2)')],
+      ['CSS :nth-last-of-type()', sel(':nth-last-of-type(2)')],
+      ['CSS :first-of-type', sel(':first-of-type')],
+      ['CSS :last-of-type', sel(':last-of-type')],
+      ['CSS :only-of-type', sel(':only-of-type')],
+      ['CSS :hover', sel(':hover')],
+      ['CSS :active', sel(':active')],
+      ['CSS :focus', sel(':focus')],
+      ['CSS :focus-visible', sel(':focus-visible')],
+      ['CSS :focus-within', sel(':focus-within')],
+      ['CSS :not()', sel(':not(.a)')],
+      ['CSS :not(complex)', sel(':not(.a, .b)')],
+      ['CSS :is()', sel(':is(.a, .b)')],
+      ['CSS :where()', sel(':where(.a, .b)')],
+      ['CSS :has()', sel(':has(+ *)')],
+      ['CSS :defined', sel(':defined')],
+      ['CSS :open', sel(':open')],
+      ['CSS :popover-open', sel(':popover-open')],
+      ['CSS :modal', sel(':modal')],
+      ['CSS :fullscreen', sel(':fullscreen')],
+      ['CSS :picture-in-picture', sel(':picture-in-picture')],
+      ['CSS :enabled', sel(':enabled')],
+      ['CSS :disabled', sel(':disabled')],
+      ['CSS :read-only', sel(':read-only')],
+      ['CSS :read-write', sel(':read-write')],
+      ['CSS :placeholder-shown', sel(':placeholder-shown')],
+      ['CSS :autofill', sel(':autofill')],
+      ['CSS :default', sel(':default')],
+      ['CSS :checked', sel(':checked')],
+      ['CSS :indeterminate', sel(':indeterminate')],
+      ['CSS :valid', sel(':valid')],
+      ['CSS :invalid', sel(':invalid')],
+      ['CSS :in-range', sel(':in-range')],
+      ['CSS :out-of-range', sel(':out-of-range')],
+      ['CSS :required', sel(':required')],
+      ['CSS :optional', sel(':optional')],
+      ['CSS :user-valid', sel(':user-valid')],
+      ['CSS :user-invalid', sel(':user-invalid')],
+      ['CSS :lang()', sel(':lang(en)')],
+      ['CSS :dir()', sel(':dir(ltr)')],
+      ['CSS :any-link', sel(':any-link)')],
+      ['CSS :link', sel(':link')],
+      ['CSS :visited', sel(':visited')],
+      ['CSS :local-link', sel(':local-link')],
+      ['CSS :target', sel(':target')],
+      ['CSS :target-within', sel(':target-within')],
+      ['CSS :scope', sel(':scope')],
+      ['CSS :host', sel(':host')],
+      ['CSS :host-context()', sel(':host-context(.a)')],
+      ['CSS :heading', sel(':heading')],
+      ['CSS :state()', sel(':state(x)')],
+    ]},
+
+    /* ========== CSS 伪元素 ========== */
+    { name: 'CSS 伪元素', category: 'css', items: [
+      ['CSS ::before', sel('::before')],
+      ['CSS ::after', sel('::after')],
+      ['CSS ::first-line', sel('::first-line')],
+      ['CSS ::first-letter', sel('::first-letter')],
+      ['CSS ::selection', sel('::selection')],
+      ['CSS ::placeholder', sel('::placeholder')],
+      ['CSS ::marker', sel('::marker')],
+      ['CSS ::backdrop', sel('::backdrop')],
+      ['CSS ::file-selector-button', sel('::file-selector-button')],
+      ['CSS ::grammar-error', sel('::grammar-error')],
+      ['CSS ::spelling-error', sel('::spelling-error')],
+      ['CSS ::target-text', sel('::target-text')],
+      ['CSS ::highlight()', sel('::highlight(x)')],
+      ['CSS ::part()', sel('::part(x)')],
+      ['CSS ::slotted()', sel('::slotted(x)')],
+      ['CSS ::cue', sel('::cue')],
+      ['CSS ::cue-region', sel('::cue-region')],
+      ['CSS ::details-content', sel('::details-content')],
+      ['CSS ::scroll-button()', sel('::scroll-button(left)')],
+      ['CSS ::scroll-marker', sel('::scroll-marker')],
+      ['CSS ::scroll-marker-group', sel('::scroll-marker-group')],
+      ['CSS ::view-transition', sel('::view-transition')],
+      ['CSS ::view-transition-group()', sel('::view-transition-group(x)')],
+      ['CSS ::view-transition-old()', sel('::view-transition-old(x)')],
+      ['CSS ::view-transition-new()', sel('::view-transition-new(x)')],
+    ]},
+
+    /* ========== CSS @规则 ========== */
+    { name: 'CSS @规则', category: 'css', items: [
+      ['@supports', () => { try { _supports('display', 'grid'); return true; } catch(e){ return false; } }],
+      ['@media', glob('CSSMediaRule')],
+      ['@keyframes', glob('CSSKeyframesRule')],
+      ['@font-face', glob('CSSFontFaceRule')],
+      ['@import', glob('CSSImportRule')],
+      ['@charset', glob('CSSCharsetRule')],
+      ['@namespace', glob('CSSNamespaceRule')],
+      ['@page', glob('CSSPageRule')],
+      ['@layer', glob('CSSLayerBlockRule')],
+      ['@container', glob('CSSContainerRule')],
+      ['@property', glob('CSSPropertyRule')],
+      ['@scope', glob('CSSScopeRule')],
+      ['@starting-style', glob('CSSStartingStyleRule')],
+      ['@position-try', glob('CSSPositionTryRule')],
+      ['@counter-style', glob('CSSCounterStyleRule')],
+      ['@font-palette-values', glob('CSSFontPaletteValuesRule')],
+      ['@font-feature-values', glob('CSSFontFeatureValuesRule')],
+      ['@view-transition', glob('CSSViewTransitionRule')],
+    ]},
+
+    /* ========== CSS 数据类型 · 单位 ========== */
+    { name: 'CSS 数据类型 · 单位', category: 'css', items: [
+      ['CSS px', sup('width', '1px')],
+      ['CSS em', sup('width', '1em')],
+      ['CSS rem', sup('width', '1rem')],
+      ['CSS ex', sup('width', '1ex')],
+      ['CSS ch', sup('width', '1ch')],
+      ['CSS cap', sup('width', '1cap')],
+      ['CSS ic', sup('width', '1ic')],
+      ['CSS lh', sup('width', '1lh')],
+      ['CSS rlh', sup('width', '1rlh')],
+      ['CSS cm', sup('width', '1cm')],
+      ['CSS mm', sup('width', '1mm')],
+      ['CSS in', sup('width', '1in')],
+      ['CSS pt', sup('width', '1pt')],
+      ['CSS pc', sup('width', '1pc')],
+      ['CSS Q', sup('width', '1Q')],
+      ['CSS deg', sup('rotate', '45deg')],
+      ['CSS grad', sup('rotate', '100grad')],
+      ['CSS rad', sup('rotate', '1rad')],
+      ['CSS turn', sup('rotate', '0.5turn')],
+      ['CSS s', sup('transition-duration', '1s')],
+      ['CSS ms', sup('transition-duration', '100ms')],
+      ['CSS Hz', sup('pitch', '100Hz')],
+      ['CSS kHz', sup('pitch', '1kHz')],
+      ['CSS dpi', sup('image-resolution', '96dpi')],
+      ['CSS dpcm', sup('image-resolution', '1dpcm')],
+      ['CSS dppx', sup('image-resolution', '1dppx')],
+      ['CSS x', sup('image-resolution', '1x')],
+      ['CSS vw', sup('width', '1vw')],
+      ['CSS vh', sup('width', '1vh')],
+      ['CSS vmin', sup('width', '1vmin')],
+      ['CSS vmax', sup('width', '1vmax')],
+      ['CSS vi', sup('width', '1vi')],
+      ['CSS vb', sup('width', '1vb')],
+      ['CSS svw', sup('width', '1svw')],
+      ['CSS svh', sup('width', '1svh')],
+      ['CSS svmin', sup('width', '1svmin')],
+      ['CSS svmax', sup('width', '1svmax')],
+      ['CSS lvw', sup('width', '1lvw')],
+      ['CSS lvh', sup('width', '1lvh')],
+      ['CSS lvmin', sup('width', '1lvmin')],
+      ['CSS lvmax', sup('width', '1lvmax')],
+      ['CSS dvw', sup('width', '1dvw')],
+      ['CSS dvh', sup('width', '1dvh')],
+      ['CSS dvmin', sup('width', '1dvmin')],
+      ['CSS dvmax', sup('width', '1dvmax')],
+      ['CSS cqw', sup('width', '1cqw')],
+      ['CSS cqh', sup('width', '1cqh')],
+      ['CSS cqi', sup('width', '1cqi')],
+      ['CSS cqb', sup('width', '1cqb')],
+      ['CSS cqmin', sup('width', '1cqmin')],
+      ['CSS cqmax', sup('width', '1cqmax')],
+      ['CSS fr', sup('grid-template-columns', '1fr')],
+      ['CSS %', sup('width', '50%')],
+    ]},
+
+    /* ========== CSS 媒体查询 ========== */
+    { name: 'CSS 媒体查询', category: 'css', items: [
+      ['@media (min-width)', mq('(min-width: 1px)')],
+      ['@media (max-width)', mq('(max-width: 9999px)')],
+      ['@media (width >= 1px)', () => { try { return window.matchMedia('(width >= 0px)').matches === true; } catch(e){ return false; } }],
+      ['@media (100px <= width <= 200px)', () => { try { return window.matchMedia('(0px <= width <= 99999px)').matches === true; } catch(e){ return false; } }],
+      ['@media (orientation)', mq('(orientation: portrait)')],
+      ['@media (aspect-ratio)', mq('(aspect-ratio: 1/1)')],
+      ['@media (color)', mq('(color)')],
+      ['@media (color-index)', mq('(color-index)')],
+      ['@media (monochrome)', mq('(monochrome)')],
+      ['@media (grid)', mq('(grid)')],
+      ['@media (scan)', mq('(scan: progressive)')],
+      ['@media (update)', mq('(update: fast)')],
+      ['@media (overflow-block)', mq('(overflow-block: scroll)')],
+      ['@media (overflow-inline)', mq('(overflow-inline: scroll)')],
+      ['@media (hover)', mq('(hover: hover)')],
+      ['@media (any-hover)', mq('(any-hover: hover)')],
+      ['@media (pointer)', mq('(pointer: fine)')],
+      ['@media (any-pointer)', mq('(any-pointer: fine)')],
+      ['@media (prefers-color-scheme)', mq('(prefers-color-scheme: dark)')],
+      ['@media (prefers-reduced-motion)', mq('(prefers-reduced-motion: reduce)')],
+      ['@media (prefers-contrast)', mq('(prefers-contrast: more)')],
+      ['@media (prefers-reduced-transparency)', mq('(prefers-reduced-transparency: reduce)')],
+      ['@media (prefers-reduced-data)', mq('(prefers-reduced-data: reduce)')],
+      ['@media (forced-colors)', mq('(forced-colors: active)')],
+      ['@media (inverted-colors)', mq('(inverted-colors: inverted)')],
+      ['@media (display-mode: standalone)', mq('(display-mode: standalone)')],
+      ['@media (display-mode: fullscreen)', mq('(display-mode: fullscreen)')],
+      ['@media (display-mode: minimal-ui)', mq('(display-mode: minimal-ui)')],
+      ['@media (display-mode: browser)', mq('(display-mode: browser)')],
+      ['@media (dynamic-range)', mq('(dynamic-range: high)')],
+      ['@media (color-gamut)', mq('(color-gamut: p3)')],
+      ['@media (scripting)', mq('(scripting: enabled)')],
+    ]},
+
+    /* ========== CSS Houdini ========== */
+    { name: 'CSS Houdini', category: 'css', items: [
+      ['CSS Typed OM', glob('CSSUnitValue')],
+      ['CSS Painting API', () => typeof CSS !== 'undefined' && 'paintWorklet' in CSS],
+      ['CSS Layout API', () => typeof CSS !== 'undefined' && 'layoutWorklet' in CSS],
+      ['CSS Animation Worklet', () => typeof CSS !== 'undefined' && 'animationWorklet' in CSS],
+      ['CSS.registerProperty()', () => typeof CSS !== 'undefined' && typeof CSS.registerProperty === 'function'],
+      ['CSSStyleSheet.replaceSync()', () => typeof CSSStyleSheet !== 'undefined' && typeof CSSStyleSheet.prototype.replaceSync === 'function'],
+      ['CSSStyleSheet.replace()', () => typeof CSSStyleSheet !== 'undefined' && typeof CSSStyleSheet.prototype.replace === 'function'],
+      ['constructable stylesheets', () => typeof CSSStyleSheet !== 'undefined' && 'replaceSync' in CSSStyleSheet.prototype],
+      ['adoptedStyleSheets', () => 'adoptedStyleSheets' in document],
+    ]},
+
+    /* ========== 媒体格式 ========== */
+    { name: '媒体格式', category: 'media', items: [
+      ['WebP', () => { try { return document.createElement('canvas').toDataURL('image/webp').indexOf('data:image/webp') === 0; } catch(e){ return false; } }],
+      ['AVIF', () => { try { return document.createElement('canvas').toDataURL('image/avif').indexOf('data:image/avif') === 0; } catch(e){ return false; } }],
+      ['JPEG XL', () => { try { return document.createElement('canvas').toDataURL('image/jxl').indexOf('data:image/jxl') === 0; } catch(e){ return false; } }],
+      ['SVG', () => { try { return document.createElement('canvas').toDataURL('image/svg+xml').indexOf('data:image/svg+xml') === 0; } catch(e){ return false; } }],
+      ['WebM (video)', () => { const v = document.createElement('video'); return !!v.canPlayType('video/webm'); }],
+      ['Ogg (video)', () => { const v = document.createElement('video'); return !!v.canPlayType('video/ogg'); }],
+      ['MP4/H.264', () => { const v = document.createElement('video'); return !!v.canPlayType('video/mp4; codecs="avc1.42E01E"'); }],
+      ['H.265/HEVC', () => { const v = document.createElement('video'); return !!v.canPlayType('video/mp4; codecs="hvc1"'); }],
+      ['VP8', () => { const v = document.createElement('video'); return !!v.canPlayType('video/webm; codecs="vp8"'); }],
+      ['VP9', () => { const v = document.createElement('video'); return !!v.canPlayType('video/webm; codecs="vp9"'); }],
+      ['AV1', () => { const v = document.createElement('video'); return !!v.canPlayType('video/mp4; codecs="av01.0.00M.08"'); }],
+      ['Dolby Vision', () => { const v = document.createElement('video'); return !!v.canPlayType('video/mp4; codecs="dvh1"'); }],
+      ['Opus', () => { const a = document.createElement('audio'); return !!a.canPlayType('audio/webm; codecs="opus"'); }],
+      ['AAC', () => { const a = document.createElement('audio'); return !!a.canPlayType('audio/mp4; codecs="mp4a.40.2"'); }],
+      ['Vorbis', () => { const a = document.createElement('audio'); return !!a.canPlayType('audio/ogg; codecs="vorbis"'); }],
+      ['FLAC', () => { const a = document.createElement('audio'); return !!a.canPlayType('audio/flac'); }],
+      ['ALAC', () => { const a = document.createElement('audio'); return !!a.canPlayType('audio/mp4; codecs="alac"'); }],
+      ['AC-3', () => { const a = document.createElement('audio'); return !!a.canPlayType('audio/ac3'); }],
+      ['E-AC-3', () => { const a = document.createElement('audio'); return !!a.canPlayType('audio/ec3'); }],
+      ['HLS', () => { const v = document.createElement('video'); return !!v.canPlayType('application/vnd.apple.mpegurl'); }],
+      ['Media Source Extensions', glob('MediaSource')],
+      ['Encrypted Media Extensions', glob('MediaKeys')],
+    ]},
+  ];
+
+  /* ===== CSS 可修补清单 ===== */
+  var CSS_PATCHABLE = {
+    ':has() 选择器': 'has',
+    'position: sticky': 'sticky',
+    'aspect-ratio': 'aspectRatio',
+    'Flexbox gap': 'flexGap',
+    ':is() 选择器': 'is',
+    ':where() 选择器': 'where',
+    'CSS :not(complex)': 'notComplex',
+    'CSS :focus-visible': 'focusVisible',
+    'CSS margin-inline': 'logical',
+    'CSS margin-block': 'logical',
+    'CSS padding-inline': 'logical',
+    'CSS padding-block': 'logical',
+    'CSS inset (shorthand)': 'inset',
+    'CSS overscroll-behavior': 'overscroll',
+    'CSS scroll-behavior': 'scrollBehavior',
+    'CSS object-fit': 'objectFit',
+    'CSS object-position': 'objectPosition',
+    'CSS scroll-snap-type': 'scrollSnap',
+    'CSS backdrop-filter': 'backdropFilter',
+    'CSS color-scheme': 'colorScheme',
+    'CSS accent-color': 'accentColor',
+    'CSS text-wrap: balance': 'textWrapBalance',
+    'CSS line-clamp': 'lineClamp',
+    'CSS caret-color': 'caretColor',
+    'CSS user-select': 'userSelect',
+    'CSS pointer-events': 'pointerEvents',
+    'CSS touch-action': 'touchAction',
+  };
+
+  /* ===== Polyfill 源码 ===== */
+  var POLYFILL_SOURCES = {
+    'Array.prototype.forEach': 'if (!Array.prototype.forEach) { Array.prototype.forEach = function (fn, thisArg) { if (this == null) throw new TypeError("this is null"); var o = Object(this), len = o.length >>> 0; for (var i = 0; i < len; i++) { if (i in o) fn.call(thisArg, o[i], i, o); } }; }',
+    'Array.prototype.map': 'if (!Array.prototype.map) { Array.prototype.map = function (fn, thisArg) { if (this == null) throw new TypeError("this is null"); var o = Object(this), len = o.length >>> 0, res = new Array(len); for (var i = 0; i < len; i++) { if (i in o) res[i] = fn.call(thisArg, o[i], i, o); } return res; }; }',
+    'Array.prototype.filter': 'if (!Array.prototype.filter) { Array.prototype.filter = function (fn, thisArg) { if (this == null) throw new TypeError("this is null"); var o = Object(this), len = o.length >>> 0, res = []; for (var i = 0; i < len; i++) { if (i in o) { var v = o[i]; if (fn.call(thisArg, v, i, o)) res.push(v); } } return res; }; }',
+    'Array.prototype.reduce': 'if (!Array.prototype.reduce) { Array.prototype.reduce = function (fn) { if (this == null) throw new TypeError("this is null"); var o = Object(this), len = o.length >>> 0, i = 0, acc; if (arguments.length >= 2) { acc = arguments[1]; } else { while (i < len && !(i in o)) i++; if (i >= len) throw new TypeError("Reduce of empty array"); acc = o[i++]; } for (; i < len; i++) { if (i in o) acc = fn(acc, o[i], i, o); } return acc; }; }',
+    'Array.prototype.some': 'if (!Array.prototype.some) { Array.prototype.some = function (fn, thisArg) { if (this == null) throw new TypeError("this is null"); var o = Object(this), len = o.length >>> 0; for (var i = 0; i < len; i++) { if (i in o && fn.call(thisArg, o[i], i, o)) return true; } return false; }; }',
+    'Array.prototype.every': 'if (!Array.prototype.every) { Array.prototype.every = function (fn, thisArg) { if (this == null) throw new TypeError("this is null"); var o = Object(this), len = o.length >>> 0; for (var i = 0; i < len; i++) { if (i in o && !fn.call(thisArg, o[i], i, o)) return false; } return true; }; }',
+    'Array.prototype.indexOf': 'if (!Array.prototype.indexOf) { Array.prototype.indexOf = function (search, fromIndex) { if (this == null) throw new TypeError("this is null"); var o = Object(this), len = o.length >>> 0, i = fromIndex | 0; if (i < 0) i = Math.max(len + i, 0); for (; i < len; i++) { if (i in o && o[i] === search) return i; } return -1; }; }',
+    'Array.prototype.lastIndexOf': 'if (!Array.prototype.lastIndexOf) { Array.prototype.lastIndexOf = function (search, fromIndex) { if (this == null) throw new TypeError("this is null"); var o = Object(this), len = o.length >>> 0, i = arguments.length > 1 ? fromIndex | 0 : len - 1; if (i < 0) i = len + i; for (; i >= 0; i--) { if (i in o && o[i] === search) return i; } return -1; }; }',
+    'Array.isArray': 'if (!Array.isArray) { Array.isArray = function (v) { return Object.prototype.toString.call(v) === "[object Array]"; }; }',
+    'Object.keys': 'if (!Object.keys) { Object.keys = function (obj) { var keys = []; for (var k in obj) { if (Object.prototype.hasOwnProperty.call(obj, k)) keys.push(k); } return keys; }; }',
+    'Object.create': 'if (!Object.create) { Object.create = function (proto, props) { function F() {} F.prototype = proto; var o = new F(); if (props) Object.defineProperties(o, props); return o; }; }',
+    'Object.defineProperty': 'if (!Object.defineProperty) { Object.defineProperty = function (obj, prop, desc) { if (desc.value !== undefined) obj[prop] = desc.value; if (desc.get) obj.__defineGetter__(prop, desc.get); if (desc.set) obj.__defineSetter__(prop, desc.set); return obj; }; }',
+    'Object.getPrototypeOf': 'if (!Object.getPrototypeOf) { Object.getPrototypeOf = function (obj) { return obj.__proto__ || obj.constructor.prototype || null; }; }',
+    'Object.getOwnPropertyNames': 'if (!Object.getOwnPropertyNames) { Object.getOwnPropertyNames = function (obj) { var keys = []; for (var k in obj) { if (Object.prototype.hasOwnProperty.call(obj, k)) keys.push(k); } return keys; }; }',
+    'Object.freeze': 'if (!Object.freeze) { Object.freeze = function(o) { return o; }; }',
+    'Object.seal': 'if (!Object.seal) { Object.seal = function(o) { return o; }; }',
+    'Function.prototype.bind': 'if (!Function.prototype.bind) { Function.prototype.bind = function (thisArg) { var fn = this, args = Array.prototype.slice.call(arguments, 1); function Bound() { var a = args.concat(Array.prototype.slice.call(arguments)); return fn.apply(this instanceof Bound ? this : thisArg, a); } Bound.prototype = Object.create(fn.prototype); return Bound; }; }',
+    'String.prototype.trim': 'if (!String.prototype.trim) { String.prototype.trim = function () { return this.replace(/^[\\s\\uFEFF\\xA0]+|[\\s\\uFEFF\\xA0]+$/g, ""); }; }',
+    'Date.now': 'if (!Date.now) { Date.now = function () { return new Date().getTime(); }; }',
+    'Array.from': 'if (!Array.from) { Array.from = function (arrayLike, mapFn, thisArg) { var res = []; var len = arrayLike.length >>> 0; for (var i = 0; i < len; i++) { res.push(mapFn ? mapFn.call(thisArg, arrayLike[i], i) : arrayLike[i]); } return res; }; }',
+    'Array.of': 'if (!Array.of) { Array.of = function () { return Array.prototype.slice.call(arguments); }; }',
+    'Array.prototype.find': 'if (!Array.prototype.find) { Array.prototype.find = function (fn, thisArg) { var len = this.length >>> 0; for (var i = 0; i < len; i++) { if (fn.call(thisArg, this[i], i, this)) return this[i]; } return undefined; }; }',
+    'Array.prototype.findIndex': 'if (!Array.prototype.findIndex) { Array.prototype.findIndex = function (fn, thisArg) { var len = this.length >>> 0; for (var i = 0; i < len; i++) { if (fn.call(thisArg, this[i], i, this)) return i; } return -1; }; }',
+    'Array.prototype.fill': 'if (!Array.prototype.fill) { Array.prototype.fill = function (value, start, end) { var len = this.length >>> 0; start = start | 0; if (start < 0) start = len + start; if (start < 0) start = 0; end = end === undefined ? len : end | 0; if (end < 0) end = len + end; if (end > len) end = len; for (var i = start; i < end; i++) this[i] = value; return this; }; }',
+    'Array.prototype.copyWithin': 'if (!Array.prototype.copyWithin) { Array.prototype.copyWithin = function (target, start, end) { var len = this.length >>> 0; target = target | 0; start = start | 0; end = end === undefined ? len : end | 0; target = target < 0 ? Math.max(len + target, 0) : Math.min(target, len); start = start < 0 ? Math.max(len + start, 0) : Math.min(start, len); end = end < 0 ? Math.max(len + end, 0) : Math.min(end, len); var count = Math.min(end - start, len - target); if (start < target && target < start + count) { for (var i = count - 1; i >= 0; i--) this[target + i] = this[start + i]; } else { for (var j = 0; j < count; j++) this[target + j] = this[start + j]; } return this; }; }',
+    'Object.assign': 'if (!Object.assign) { Object.assign = function (target) { if (target == null) throw new TypeError("Cannot convert undefined or null to object"); var to = Object(target); for (var i = 1; i < arguments.length; i++) { var src = arguments[i]; if (src != null) { for (var k in src) { if (Object.prototype.hasOwnProperty.call(src, k)) to[k] = src[k]; } } } return to; }; }',
+    'Object.is': 'if (!Object.is) { Object.is = function (a, b) { if (a === b) return a !== 0 || 1 / a === 1 / b; return a !== a && b !== b; }; }',
+    'Object.setPrototypeOf': 'if (!Object.setPrototypeOf) { Object.setPrototypeOf = function (obj, proto) { obj.__proto__ = proto; return obj; }; }',
+    'Object.getOwnPropertySymbols': 'if (!Object.getOwnPropertySymbols) { Object.getOwnPropertySymbols = function () { return []; }; }',
+    'String.prototype.includes': 'if (!String.prototype.includes) { String.prototype.includes = function (search, start) { return this.indexOf(search, start || 0) !== -1; }; }',
+    'String.prototype.startsWith': 'if (!String.prototype.startsWith) { String.prototype.startsWith = function (search, pos) { pos = pos || 0; return this.substring(pos, pos + search.length) === search; }; }',
+    'String.prototype.endsWith': 'if (!String.prototype.endsWith) { String.prototype.endsWith = function (search, len) { if (len === undefined || len > this.length) len = this.length; return this.substring(len - search.length, len) === search; }; }',
+    'String.prototype.repeat': 'if (!String.prototype.repeat) { String.prototype.repeat = function (n) { n = n | 0; if (n < 0) throw new RangeError("Invalid count value"); if (n === 0) return ""; var s = "", str = String(this); while (n > 0) { if (n & 1) s += str; n >>>= 1; if (n) str += str; } return s; }; }',
+    'String.prototype.codePointAt': 'if (!String.prototype.codePointAt) { String.prototype.codePointAt = function (pos) { pos = pos | 0; if (pos < 0 || pos >= this.length) return undefined; var c = this.charCodeAt(pos); if (c >= 0xD800 && c <= 0xDBFF && pos + 1 < this.length) { var c2 = this.charCodeAt(pos + 1); if (c2 >= 0xDC00 && c2 <= 0xDFFF) return (c - 0xD800) * 0x400 + c2 - 0xDC00 + 0x10000; } return c; }; }',
+    'String.fromCodePoint': 'if (!String.fromCodePoint) { String.fromCodePoint = function () { var chars = []; for (var i = 0; i < arguments.length; i++) { var c = Number(arguments[i]); if (c < 0 || c > 0x10FFFF || c !== Math.floor(c)) throw new RangeError("Invalid code point " + c); if (c <= 0xFFFF) { chars.push(String.fromCharCode(c)); } else { c -= 0x10000; chars.push(String.fromCharCode((c >> 10) + 0xD800)); chars.push(String.fromCharCode((c & 0x3FF) + 0xDC00)); } } return chars.join(""); }; }',
+    'String.raw': 'if (!String.raw) { String.raw = function(strings) { var raw = strings.raw || strings; var result = ""; for (var i = 0; i < raw.length; i++) { result += raw[i]; if (i < arguments.length - 1) result += arguments[i + 1]; } return result; }; }',
+    'Number.isInteger': 'if (!Number.isInteger) { Number.isInteger = function (v) { return typeof v === "number" && isFinite(v) && Math.floor(v) === v; }; }',
+    'Number.isNaN': 'if (!Number.isNaN) { Number.isNaN = function (v) { return typeof v === "number" && v !== v; }; }',
+    'Number.isFinite': 'if (!Number.isFinite) { Number.isFinite = function (v) { return typeof v === "number" && isFinite(v); }; }',
+    'Number.isSafeInteger': 'if (!Number.isSafeInteger) { Number.isSafeInteger = function (v) { return Number.isInteger(v) && Math.abs(v) <= Number.MAX_SAFE_INTEGER; }; }',
+    'Number.EPSILON': 'if (typeof Number.EPSILON !== "number") { Number.EPSILON = Math.pow(2, -52); }',
+    'Number.MAX_SAFE_INTEGER': 'if (typeof Number.MAX_SAFE_INTEGER !== "number") { Number.MAX_SAFE_INTEGER = Math.pow(2, 53) - 1; }',
+    'Number.parseInt': 'if (!Number.parseInt) { Number.parseInt = parseInt; }',
+    'Math.trunc': 'if (!Math.trunc) { Math.trunc = function (v) { v = Number(v); return (v < 0 ? Math.ceil(v) : Math.floor(v)) || 0; }; }',
+    'Math.sign': 'if (!Math.sign) { Math.sign = function (v) { v = Number(v); if (v === 0 || v !== v) return v; return v > 0 ? 1 : -1; }; }',
+    'Math.cbrt': 'if (!Math.cbrt) { Math.cbrt = function (v) { v = Number(v); return v < 0 ? -Math.pow(-v, 1 / 3) : Math.pow(v, 1 / 3); }; }',
+    'Math.log2': 'if (!Math.log2) { Math.log2 = function (v) { return Math.log(v) / Math.LN2; }; }',
+    'Math.log10': 'if (!Math.log10) { Math.log10 = function (v) { return Math.log(v) / Math.LN10; }; }',
+    'Math.hypot': 'if (!Math.hypot) { Math.hypot = function () { var sum = 0; for (var i = 0; i < arguments.length; i++) { sum += Number(arguments[i]) * Number(arguments[i]); } return Math.sqrt(sum); }; }',
+    'Array.prototype.includes': 'if (!Array.prototype.includes) { Array.prototype.includes = function (search, fromIndex) { var len = this.length >>> 0, i = fromIndex | 0; if (i < 0) i = Math.max(len + i, 0); for (; i < len; i++) { var v = this[i]; if (v === search || (search !== search && v !== v)) return true; } return false; }; }',
+    'Object.values': 'if (!Object.values) { Object.values = function (obj) { var res = []; for (var k in obj) { if (Object.prototype.hasOwnProperty.call(obj, k)) res.push(obj[k]); } return res; }; }',
+    'Object.entries': 'if (!Object.entries) { Object.entries = function (obj) { var res = []; for (var k in obj) { if (Object.prototype.hasOwnProperty.call(obj, k)) res.push([k, obj[k]]); } return res; }; }',
+    'Object.getOwnPropertyDescriptors': 'if (!Object.getOwnPropertyDescriptors) { Object.getOwnPropertyDescriptors = function (obj) { var descs = {}; for (var k in obj) { if (Object.prototype.hasOwnProperty.call(obj, k)) { descs[k] = Object.getOwnPropertyDescriptor(obj, k) || { value: obj[k], writable: true, enumerable: true, configurable: true }; } } return descs; }; }',
+    'String.prototype.padStart': 'if (!String.prototype.padStart) { String.prototype.padStart = function (targetLength, padString) { padString = padString === undefined ? " " : String(padString); var str = String(this); if (str.length >= targetLength) return str; var needed = targetLength - str.length; var pad = ""; while (pad.length < needed) pad += padString; return pad.slice(0, needed) + str; }; }',
+    'String.prototype.padEnd': 'if (!String.prototype.padEnd) { String.prototype.padEnd = function (targetLength, padString) { padString = padString === undefined ? " " : String(padString); var str = String(this); if (str.length >= targetLength) return str; var needed = targetLength - str.length; var pad = ""; while (pad.length < needed) pad += padString; return str + pad.slice(0, needed); }; }',
+    'Promise.prototype.finally': 'if (typeof Promise !== "undefined" && !Promise.prototype.finally) { Promise.prototype.finally = function (cb) { var P = this.constructor; return this.then(function (v) { return P.resolve(cb()).then(function () { return v; }); }, function (r) { return P.resolve(cb()).then(function () { throw r; }); }); }; }',
+    'Array.prototype.flat': 'if (!Array.prototype.flat) { Array.prototype.flat = function (depth) { depth = depth === undefined ? 1 : Math.trunc(depth); function flatten(arr, d) { var res = []; for (var i = 0; i < arr.length; i++) { if (Array.isArray(arr[i]) && d > 0) { var sub = flatten(arr[i], d - 1); for (var j = 0; j < sub.length; j++) res.push(sub[j]); } else { res.push(arr[i]); } } return res; } return flatten(this, depth); }; }',
+    'Array.prototype.flatMap': 'if (!Array.prototype.flatMap) { Array.prototype.flatMap = function (fn, thisArg) { return this.map(fn, thisArg).flat(); }; }',
+    'Object.fromEntries': 'if (!Object.fromEntries) { Object.fromEntries = function (iterable) { var obj = {}; if (iterable && typeof iterable[Symbol.iterator] === "function") { for (var pair of iterable) { obj[pair[0]] = pair[1]; } } else { for (var k in iterable) { if (Object.prototype.hasOwnProperty.call(iterable, k)) obj[k] = iterable[k]; } } return obj; }; }',
+    'String.prototype.trimStart': 'if (!String.prototype.trimStart) { String.prototype.trimStart = function () { return this.replace(/^[\\s\\uFEFF\\xA0]+/, ""); }; }',
+    'String.prototype.trimEnd': 'if (!String.prototype.trimEnd) { String.prototype.trimEnd = function () { return this.replace(/[\\s\\uFEFF\\xA0]+$/, ""); }; }',
+    'Promise.allSettled': 'if (typeof Promise !== "undefined" && !Promise.allSettled) { Promise.allSettled = function (promises) { return Promise.all(Array.prototype.map.call(promises, function (p) { return Promise.resolve(p).then(function (value) { return { status: "fulfilled", value: value }; }, function (reason) { return { status: "rejected", reason: reason }; }); })); }; }',
+    'globalThis': 'if (typeof globalThis === "undefined") { (function () { var g = typeof window !== "undefined" ? window : typeof self !== "undefined" ? self : typeof global !== "undefined" ? global : this; try { Object.defineProperty(g, "globalThis", { value: g, configurable: true, writable: true }); } catch (e) { g.globalThis = g; } })(); }',
+    'String.prototype.matchAll': 'if (!String.prototype.matchAll) { String.prototype.matchAll = function (regexp) { var re = regexp instanceof RegExp ? regexp : new RegExp(regexp, "g"); if (!re.global) throw new TypeError("matchAll requires a global regex"); var str = String(this), matches = [], m, last = re.lastIndex; re.lastIndex = 0; while ((m = re.exec(str)) !== null) { matches.push(m); if (m[0] === "") re.lastIndex++; } re.lastIndex = last; if (typeof Symbol === "function" && matches[Symbol.iterator]) return matches[Symbol.iterator](); return matches; }; }',
+    'String.prototype.replaceAll': 'if (!String.prototype.replaceAll) { String.prototype.replaceAll = function (search, replacement) { if (search instanceof RegExp) { if (!search.global) throw new TypeError("replaceAll must be called with a global RegExp"); return this.replace(search, replacement); } var escaped = String(search).replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&"); return this.replace(new RegExp(escaped, "g"), replacement); }; }',
+    'Promise.any': 'if (typeof Promise !== "undefined" && !Promise.any) { Promise.any = function(promises) { return new Promise(function(resolve, reject) { var arr = Array.prototype.slice.call(promises); if (arr.length === 0) { reject(new AggregateError([], "All promises were rejected")); return; } var pending = arr.length; var errors = []; arr.forEach(function(p, i) { Promise.resolve(p).then(resolve, function(e) { errors[i] = e; if (--pending === 0) reject(new AggregateError(errors, "All promises were rejected")); }); }); }); }; }',
+    'AggregateError': 'if (typeof AggregateError === "undefined") { (function () { function AE(errors, message) { var e = new Error(message); e.name = "AggregateError"; e.errors = errors; if (Object.setPrototypeOf) Object.setPrototypeOf(e, AE.prototype); return e; } AE.prototype = Object.create(Error.prototype); AE.prototype.constructor = AE; window.AggregateError = AE; })(); }',
+    'WeakRef': 'if (typeof WeakRef === "undefined") { window.WeakRef = function WeakRef(target) { this.deref = function () { return target; }; }; }',
+    'FinalizationRegistry': 'if (typeof FinalizationRegistry === "undefined") { window.FinalizationRegistry = function FinalizationRegistry() { this.register = function () {}; this.unregister = function () {}; }; }',
+    'Array.prototype.at': 'if (!Array.prototype.at) { Array.prototype.at = function (n) { n = Math.trunc(n) || 0; if (n < 0) n += this.length; return n < 0 || n >= this.length ? undefined : this[n]; }; }',
+    'String.prototype.at': 'if (!String.prototype.at) { String.prototype.at = function (n) { n = Math.trunc(n) || 0; if (n < 0) n += this.length; return n < 0 || n >= this.length ? undefined : this.charAt(n); }; }',
+    'Object.hasOwn': 'if (!Object.hasOwn) { Object.hasOwn = function (obj, prop) { return Object.prototype.hasOwnProperty.call(obj, prop); }; }',
+    'Array.prototype.findLast': 'if (!Array.prototype.findLast) { Array.prototype.findLast = function (fn, thisArg) { for (var i = this.length - 1; i >= 0; i--) { if (fn.call(thisArg, this[i], i, this)) return this[i]; } return undefined; }; }',
+    'Array.prototype.findLastIndex': 'if (!Array.prototype.findLastIndex) { Array.prototype.findLastIndex = function (fn, thisArg) { for (var i = this.length - 1; i >= 0; i--) { if (fn.call(thisArg, this[i], i, this)) return i; } return -1; }; }',
+    'Array.prototype.toReversed': 'if (!Array.prototype.toReversed) { Array.prototype.toReversed = function () { return this.slice().reverse(); }; }',
+    'Array.prototype.toSorted': 'if (!Array.prototype.toSorted) { Array.prototype.toSorted = function (compareFn) { return this.slice().sort(compareFn); }; }',
+    'Array.prototype.toSpliced': 'if (!Array.prototype.toSpliced) { Array.prototype.toSpliced = function (start, deleteCount) { var copy = this.slice(); var args = [start, deleteCount].concat(Array.prototype.slice.call(arguments, 2)); copy.splice.apply(copy, args); return copy; }; }',
+    'Array.prototype.with': 'if (!Array.prototype.with) { Array.prototype.with = function (index, value) { var copy = this.slice(); var i = index < 0 ? copy.length + index : index; copy[i] = value; return copy; }; }',
+    'Object.groupBy': 'if (!Object.groupBy) { Object.groupBy = function (items, callback) { var result = Object.create(null); var i = 0; for (var item of items) { var key = callback(item, i++); if (!Object.prototype.hasOwnProperty.call(result, key)) result[key] = []; result[key].push(item); } return result; }; }',
+    'Map.groupBy': 'if (typeof Map !== "undefined" && !Map.groupBy) { Map.groupBy = function (items, callback) { var result = new Map(); var i = 0; for (var item of items) { var key = callback(item, i++); if (!result.has(key)) result.set(key, []); result.get(key).push(item); } return result; }; }',
+    'Promise.withResolvers': 'if (typeof Promise !== "undefined" && !Promise.withResolvers) { Promise.withResolvers = function () { var resolve, reject; var promise = new Promise(function (res, rej) { resolve = res; reject = rej; }); return { promise: promise, resolve: resolve, reject: reject }; }; }',
+    'Promise.try': 'if (typeof Promise !== "undefined" && !Promise.try) { Promise.try = function(fn) { var args = Array.prototype.slice.call(arguments, 1); return new Promise(function(resolve) { resolve(fn.apply(this, args)); }); }; }',
+    'String.prototype.isWellFormed': 'if (!String.prototype.isWellFormed) { String.prototype.isWellFormed = function () { for (var i = 0; i < this.length; i++) { var c = this.charCodeAt(i); if (c >= 0xD800 && c <= 0xDBFF) { var c2 = this.charCodeAt(i + 1); if (!(c2 >= 0xDC00 && c2 <= 0xDFFF)) return false; i++; } else if (c >= 0xDC00 && c <= 0xDFFF) { return false; } } return true; }; }',
+    'String.prototype.toWellFormed': 'if (!String.prototype.toWellFormed) { String.prototype.toWellFormed = function () { var res = ""; for (var i = 0; i < this.length; i++) { var c = this.charCodeAt(i); if (c >= 0xD800 && c <= 0xDBFF) { var c2 = this.charCodeAt(i + 1); if (c2 >= 0xDC00 && c2 <= 0xDFFF) { res += this[i] + this[i + 1]; i++; } else { res += "\\uFFFD"; } } else if (c >= 0xDC00 && c <= 0xDFFF) { res += "\\uFFFD"; } else { res += this[i]; } } return res; }; }',
+    'Set.prototype.union': 'if (!Set.prototype.union) { Set.prototype.union = function (other) { var r = new Set(this); for (var v of other) r.add(v); return r; }; }',
+    'Set.prototype.intersection': 'if (!Set.prototype.intersection) { Set.prototype.intersection = function (other) { var r = new Set(); for (var v of this) if (other.has(v)) r.add(v); return r; }; }',
+    'Set.prototype.difference': 'if (!Set.prototype.difference) { Set.prototype.difference = function (other) { var r = new Set(); for (var v of this) if (!other.has(v)) r.add(v); return r; }; }',
+    'Set.prototype.symmetricDifference': 'if (!Set.prototype.symmetricDifference) { Set.prototype.symmetricDifference = function (other) { var r = new Set(); for (var v of this) if (!other.has(v)) r.add(v); for (var w of other) if (!this.has(w)) r.add(w); return r; }; }',
+    'Set.prototype.isSubsetOf': 'if (!Set.prototype.isSubsetOf) { Set.prototype.isSubsetOf = function (other) { for (var v of this) if (!other.has(v)) return false; return true; }; }',
+    'Set.prototype.isSupersetOf': 'if (!Set.prototype.isSupersetOf) { Set.prototype.isSupersetOf = function (other) { for (var v of other) if (!this.has(v)) return false; return true; }; }',
+    'Set.prototype.isDisjointFrom': 'if (!Set.prototype.isDisjointFrom) { Set.prototype.isDisjointFrom = function (other) { for (var v of this) if (other.has(v)) return false; return true; }; }',
+    'fetch': 'if (typeof fetch === "undefined") { window.fetch = function (url, options) { options = options || {}; return new Promise(function (resolve, reject) { var xhr = new XMLHttpRequest(); xhr.open(options.method || "GET", url, true); if (options.headers) { for (var k in options.headers) { if (Object.prototype.hasOwnProperty.call(options.headers, k)) { try { xhr.setRequestHeader(k, options.headers[k]); } catch (e) {} } } } xhr.onload = function () { var body = xhr.responseText; resolve({ ok: xhr.status >= 200 && xhr.status < 300, status: xhr.status, statusText: xhr.statusText, url: xhr.responseURL || url, text: function () { return Promise.resolve(body); }, json: function () { return Promise.resolve(JSON.parse(body)); }, headers: { get: function (n) { return xhr.getResponseHeader(n); } } }); }; xhr.onerror = function () { reject(new TypeError("Network request failed")); }; xhr.send(options.body || null); }); }; }',
+    'AbortController': 'if (typeof AbortController === "undefined") { (function () { function AbortSignal() { this.aborted = false; this.onabort = null; this._listeners = []; } AbortSignal.prototype.addEventListener = function (type, fn) { if (type === "abort") this._listeners.push(fn); }; AbortSignal.prototype.removeEventListener = function (type, fn) { if (type === "abort") { var i = this._listeners.indexOf(fn); if (i > -1) this._listeners.splice(i, 1); } }; AbortSignal.prototype.dispatchEvent = function () { return true; }; function AbortController() { this.signal = new AbortSignal(); } AbortController.prototype.abort = function () { if (this.signal.aborted) return; this.signal.aborted = true; var e = { type: "abort", target: this.signal }; for (var i = 0; i < this.signal._listeners.length; i++) { try { this.signal._listeners[i].call(this.signal, e); } catch (err) {} } if (typeof this.signal.onabort === "function") this.signal.onabort.call(this.signal, e); }; window.AbortController = AbortController; window.AbortSignal = AbortSignal; })(); }',
+    'AbortSignal.timeout': 'if (typeof AbortSignal !== "undefined" && !AbortSignal.timeout) { AbortSignal.timeout = function(ms) { var ctrl = new AbortController(); setTimeout(function() { ctrl.abort(new DOMException("TimeoutError", "TimeoutError")); }, ms); return ctrl.signal; }; }',
+    'AbortSignal.abort': 'if (typeof AbortSignal !== "undefined" && !AbortSignal.abort) { AbortSignal.abort = function(reason) { var ctrl = new AbortController(); ctrl.abort(reason); return ctrl.signal; }; }',
+    'structuredClone': 'if (typeof structuredClone === "undefined") { window.structuredClone = function structuredClone(value) { var seen = new WeakMap(); function clone(val) { if (val === null || typeof val !== "object") return val; if (seen.has(val)) return seen.get(val); if (val instanceof Date) return new Date(val.getTime()); if (val instanceof RegExp) return new RegExp(val.source, val.flags); if (val instanceof Map) { var m = new Map(); seen.set(val, m); val.forEach(function (v, k) { m.set(clone(k), clone(v)); }); return m; } if (val instanceof Set) { var s = new Set(); seen.set(val, s); val.forEach(function (v) { s.add(clone(v)); }); return s; } if (Array.isArray(val)) { var arr = []; seen.set(val, arr); val.forEach(function (v, i) { arr[i] = clone(v); }); return arr; } if (typeof ArrayBuffer !== "undefined" && val instanceof ArrayBuffer) return val.slice(0); if (typeof ArrayBuffer !== "undefined" && ArrayBuffer.isView && ArrayBuffer.isView(val)) return new val.constructor(val.buffer.slice(0)); var obj = Object.create(Object.getPrototypeOf(val)); seen.set(val, obj); Object.getOwnPropertyNames(val).forEach(function (k) { obj[k] = clone(val[k]); }); return obj; } return clone(value); }; }',
+    'queueMicrotask': 'if (typeof queueMicrotask === "undefined") { window.queueMicrotask = function (cb) { Promise.resolve().then(cb); }; }',
+    'crypto.randomUUID': 'if (typeof crypto === "undefined") { window.crypto = {}; } if (typeof crypto.randomUUID === "undefined") { crypto.randomUUID = function () { var bytes = new Uint8Array(16); if (crypto.getRandomValues) { crypto.getRandomValues(bytes); } else { for (var i = 0; i < 16; i++) bytes[i] = Math.floor(Math.random() * 256); } bytes[6] = (bytes[6] & 0x0f) | 0x40; bytes[8] = (bytes[8] & 0x3f) | 0x80; var hex = []; for (var j = 0; j < 256; j++) hex[j] = (j + 0x100).toString(16).slice(1); return hex[bytes[0]] + hex[bytes[1]] + hex[bytes[2]] + hex[bytes[3]] + "-" + hex[bytes[4]] + hex[bytes[5]] + "-" + hex[bytes[6]] + hex[bytes[7]] + "-" + hex[bytes[8]] + hex[bytes[9]] + "-" + hex[bytes[10]] + hex[bytes[11]] + hex[bytes[12]] + hex[bytes[13]] + hex[bytes[14]] + hex[bytes[15]]; }; }',
+    'requestAnimationFrame': 'if (typeof requestAnimationFrame === "undefined") { window.requestAnimationFrame = function (cb) { return setTimeout(function () { cb(Date.now()); }, 16); }; window.cancelAnimationFrame = function (id) { clearTimeout(id); }; }',
+    'CustomEvent': 'if (typeof CustomEvent === "undefined") { window.CustomEvent = function (event, params) { params = params || { bubbles: false, cancelable: false, detail: null }; var evt = document.createEvent("CustomEvent"); evt.initCustomEvent(event, params.bubbles, params.cancelable, params.detail); return evt; }; CustomEvent.prototype = window.Event.prototype; }',
+    'matchMedia': 'if (typeof window.matchMedia === "undefined") { window.matchMedia = function (query) { var dark = false; try { dark = window.getComputedStyle(document.documentElement).getPropertyValue("color-scheme").indexOf("dark") > -1; } catch(e) {} var matches = false; if (query.indexOf("prefers-color-scheme: dark") > -1) matches = dark; else if (query.indexOf("prefers-color-scheme: light") > -1) matches = !dark; else if (query.indexOf("prefers-reduced-motion: reduce") > -1) matches = false; else if (query.indexOf("hover: hover") > -1) matches = true; else if (query.indexOf("pointer: fine") > -1) matches = true; return { matches: matches, media: query, onchange: null, addListener: function() {}, removeListener: function() {}, addEventListener: function() {}, removeEventListener: function() {}, dispatchEvent: function() { return false; } }; }; }',
+    'Element.matches': 'if (typeof Element !== "undefined" && !Element.prototype.matches) { Element.prototype.matches = Element.prototype.msMatchesSelector || Element.prototype.webkitMatchesSelector || function (s) { var m = (this.document || this.ownerDocument).querySelectorAll(s), i = m.length; while (--i >= 0 && m[i] !== this) {} return i > -1; }; }',
+    'Element.closest': 'if (typeof Element !== "undefined" && !Element.prototype.closest) { Element.prototype.closest = function (selector) { var el = this; while (el && el.nodeType === 1) { if (el.matches(selector)) return el; el = el.parentElement || el.parentNode; } return null; }; }',
+    'Element.remove': 'if (typeof Element !== "undefined" && !Element.prototype.remove) { Element.prototype.remove = function () { if (this.parentNode) this.parentNode.removeChild(this); }; }',
+    'Element.append': 'if (typeof Element !== "undefined" && !Element.prototype.append) { Element.prototype.append = function () { for (var i = 0; i < arguments.length; i++) { var n = arguments[i]; if (typeof n === "string") n = document.createTextNode(n); this.appendChild(n); } }; }',
+    'Element.prepend': 'if (typeof Element !== "undefined" && !Element.prototype.prepend) { Element.prototype.prepend = function () { var first = this.firstChild; for (var i = 0; i < arguments.length; i++) { var n = arguments[i]; if (typeof n === "string") n = document.createTextNode(n); this.insertBefore(n, first); } }; }',
+    'NodeList.prototype.forEach': 'if (typeof NodeList !== "undefined" && !NodeList.prototype.forEach) { NodeList.prototype.forEach = Array.prototype.forEach; }',
+    'CSS.supports': 'if (typeof CSS === "undefined") { window.CSS = {}; } if (!CSS.supports) { CSS.supports = function () { var prop, value; if (arguments.length === 1) { var parts = String(arguments[0]).split(":"); if (parts.length < 2) return false; prop = parts[0].trim(); value = parts.slice(1).join(":").trim(); } else { prop = arguments[0]; value = arguments[1]; } var el = document.createElement("div"); var camel = prop.replace(/-([a-z])/g, function (_, c) { return c.toUpperCase(); }); if (camel in el.style) { el.style[camel] = value; return el.style[camel] !== ""; } return false; }; }',
+    'navigator.sendBeacon': 'if (!navigator.sendBeacon) { navigator.sendBeacon = function(url, data) { try { var xhr = new XMLHttpRequest(); xhr.open("POST", url, false); xhr.send(data); return true; } catch(e){ return false; } }; }',
+  };
+
+  /* ===== 工具函数 ===== */
+  var $ = function (id) { return document.getElementById(id); };
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]); });
+  }
+  var sleep = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
+  function detectKernelVersion() {
+    var m = /(Chrome|CriOS)\/(\d+)/.exec(navigator.userAgent);
+    return m ? 'Chromium ' + m[2] : '未知';
+  }
+
+  /* ===== 进度环 & 滚动 ===== */
+  var RING_CIRCUMFERENCE = 2 * Math.PI * 50;
+  function updateRing(done, total) {
+    var pct = done / total;
+    var offset = RING_CIRCUMFERENCE * (1 - pct);
+    var ringFg = $('ring-fg');
+    if (ringFg) ringFg.style.strokeDashoffset = offset;
+    $('ring-current').textContent = done;
+    $('ring-total').textContent = total;
+  }
+
+  var scrollTrack = $('scroll-track');
+  var scrollAnimating = false;
+  var lastScrollPush = 0;
+
+  function pushScrollItem(name) {
+    var now = Date.now();
+    if (now - lastScrollPush < 40) return;
+    lastScrollPush = now;
+    if (scrollAnimating) return;
+    var item = document.createElement('div');
+    item.className = 'scroll-item active';
+    item.textContent = '▸ ' + name;
+    scrollTrack.appendChild(item);
+    while (scrollTrack.children.length > 4) scrollTrack.removeChild(scrollTrack.firstChild);
+    if (scrollTrack.children.length > 3) {
+      scrollAnimating = true;
+      scrollTrack.style.transition = 'transform 0.1s ease-out';
+      scrollTrack.style.transform = 'translateY(-28px)';
+      setTimeout(function () {
+        scrollTrack.removeChild(scrollTrack.firstChild);
+        scrollTrack.style.transition = 'none';
+        scrollTrack.style.transform = 'translateY(0)';
+        void scrollTrack.offsetHeight;
+        scrollAnimating = false;
+      }, 100);
+    }
+  }
+
+  /* ===== 执行检测 ===== */
+  var testResults = [];
+  var supportedTotal = 0;
+  var missingTotal = 0;
+  var totalTests = 0;
+
+  for (var gi = 0; gi < TEST_GROUPS.length; gi++) totalTests += TEST_GROUPS[gi].items.length;
+  $('ring-total').textContent = totalTests;
+
+  async function runAllTests() {
+    var done = 0, sinceLastPush = 0;
+    testResults = [];
+    supportedTotal = 0;
+    missingTotal = 0;
+
+    for (var gi = 0; gi < TEST_GROUPS.length; gi++) {
+      var group = TEST_GROUPS[gi];
+      var groupResult = { group: group.name, category: group.category || 'js', items: [] };
+      for (var ii = 0; ii < group.items.length; ii++) {
+        var name = group.items[ii][0], fn = group.items[ii][1];
+        var ok = false;
+        try { ok = !!fn(); } catch (e) { ok = false; }
+        groupResult.items.push({ name: name, supported: ok });
+        if (ok) supportedTotal++; else missingTotal++;
+        done++;
+        sinceLastPush++;
+        if (sinceLastPush >= 8 || done === totalTests) {
+          updateRing(done, totalTests);
+          pushScrollItem(name);
+          sinceLastPush = 0;
+          await sleep(6);
+        }
+      }
+      testResults.push(groupResult);
+    }
+    updateRing(totalTests, totalTests);
+    var lastItem = document.createElement('div');
+    lastItem.className = 'scroll-item active';
+    lastItem.textContent = '✓ 检测完成';
+    scrollTrack.appendChild(lastItem);
+  }
+
+  /* ===== 渲染结果 ===== */
+  var CATEGORY_LABELS = { api: 'Web API', css: 'CSS', js: 'JavaScript', media: '媒体格式', security: '安全特性' };
+  var currentFilter = 'all';
+
+  function renderResults() {
+    var html = '';
+    var categories = ['api', 'css', 'js', 'media', 'security'];
+    for (var ci = 0; ci < categories.length; ci++) {
+      var cat = categories[ci];
+      if (currentFilter !== 'all' && currentFilter !== cat) continue;
+      var groups = testResults.filter(function (g) { return g.category === cat; });
+      if (groups.length === 0) continue;
+      html += '<div class="category-title">' + escapeHtml(CATEGORY_LABELS[cat] || cat) + '</div>';
+      for (var gi = 0; gi < groups.length; gi++) {
+        var group = groups[gi];
+        html += '<div class="group-title">' + escapeHtml(group.group) + '</div>';
+        for (var ii = 0; ii < group.items.length; ii++) {
+          var item = group.items[ii];
+          var cls, sym;
+          if (item.supported) { cls = 'ok'; sym = '✓'; }
+          else if (cat === 'css' && CSS_PATCHABLE[item.name]) { cls = 'warn'; sym = '⚡'; }
+          else { cls = 'no'; sym = '✕'; }
+          html += '<div class="item ' + (item.supported ? '' : 'no') + '">'
+                +   '<span class="icon ' + cls + '">' + sym + '</span>'
+                +   '<span class="item-name">' + escapeHtml(item.name) + '</span>'
+                + '</div>';
+        }
+      }
+    }
+    $('results-content').innerHTML = html;
+    $('supported-count').textContent = supportedTotal;
+    $('missing-count').textContent = missingTotal;
+  }
+
+  function getMissingNames(category) {
+    var names = [];
+    for (var gi = 0; gi < testResults.length; gi++) {
+      var group = testResults[gi];
+      if (category && group.category !== category) continue;
+      for (var ii = 0; ii < group.items.length; ii++) {
+        if (!group.items[ii].supported) names.push(group.items[ii].name);
+      }
+    }
+    return names;
+  }
+
+  /* ===== 生成统一脚本 ===== */
+  function generateUnifiedScript() {
+    var jsMissing = getMissingNames('js');
+    var jsPolyfillKeys = jsMissing.filter(function (n) { return POLYFILL_SOURCES[n]; });
+    var jsNoPolyfill = jsMissing.filter(function (n) { return !POLYFILL_SOURCES[n]; });
+    var cssMissing = getMissingNames('css');
+    var cssPatchable = cssMissing.filter(function (n) { return CSS_PATCHABLE[n]; });
+    var ua = navigator.userAgent;
+    var kernel = detectKernelVersion();
+    var now = new Date().toISOString();
+    var L = [];
+    L.push('// ==UserScript==');
+    L.push('// @name         统一 Polyfill · ' + kernel);
+    L.push('// @namespace    http://tampermonkey.net/');
+    L.push('// @version      4.0.0');
+    L.push('// @description  针对 ' + kernel + ' 生成的统一 Polyfill');
+    L.push('// @author       Polyfill Generator');
+    L.push('// @match        *://*/*');
+    L.push('// @run-at       document-start');
+    L.push('// @grant        none');
+    L.push('// ==/UserScript==');
+    L.push('');
+    L.push('/*');
+    L.push(' * 生成时间: ' + now);
+    L.push(' * 目标 UA : ' + ua);
+    L.push(' * 检测内核: ' + kernel);
+    L.push(' *');
+    L.push(' * JS 缺失: ' + jsMissing.length + ' 项（可补全 ' + jsPolyfillKeys.length + ' 项）');
+    if (jsNoPolyfill.length) L.push(' *   无法补全: ' + jsNoPolyfill.join('、'));
+    L.push(' *');
+    L.push(' * CSS 缺失: ' + cssMissing.length + ' 项（可修补 ' + cssPatchable.length + ' 项）');
+    L.push(' */');
+    L.push('');
+    L.push('(function () {');
+    L.push("    'use strict';");
+    L.push('');
+
+    if (jsPolyfillKeys.length > 0) {
+      L.push('    // ===== JS Polyfill =====');
+      L.push("    var jsCode = '';");
+      L.push('');
+      for (var ki = 0; ki < jsPolyfillKeys.length; ki++) {
+        var key = jsPolyfillKeys[ki];
+        var src = POLYFILL_SOURCES[key];
+        var escaped = src.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n').replace(/\r/g, '\\r');
+        L.push('    // ' + key);
+        L.push("    jsCode += '" + escaped + "\\n';");
+        L.push('');
+      }
+      L.push('    function injectJs(src) {');
+      L.push("        var s = document.createElement('script');");
+      L.push('        s.textContent = src;');
+      L.push("        var root = document.head || document.documentElement;");
+      L.push('        if (root) { root.appendChild(s); s.parentNode.removeChild(s); }');
+      L.push("        else { document.addEventListener('readystatechange', function h() { if (document.head || document.documentElement) { document.removeEventListener('readystatechange', h); injectJs(src); } }); }");
+      L.push('    }');
+      L.push('');
+      L.push('    injectJs(jsCode);');
+      L.push('');
+    } else {
+      L.push('    // 无缺失的 JS 特性需要补全');
+      L.push('');
+    }
+
+    if (cssPatchable.length > 0) {
+      L.push('    // ===== CSS Patch =====');
+      L.push('    // 可修补: ' + cssPatchable.join('、'));
+      L.push('');
+      if (cssPatchable.indexOf(':has() 选择器') > -1) {
+        L.push('    // ----- :has() 选择器 -----');
+        L.push("    if (!(typeof CSS !== 'undefined' && CSS.supports && CSS.supports('selector(:has(+ *))'))) {");
+        L.push('        var __hasStyle = document.createElement("style");');
+        L.push('        __hasStyle.id = "__has_polyfill_style";');
+        L.push('        function __hasHash(s) { var h = 0; for (var i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0; return Math.abs(h).toString(36); }');
+        L.push('        function __applyHas() {');
+        L.push('            if (!__hasStyle.parentNode) (document.head || document.documentElement).appendChild(__hasStyle);');
+        L.push("            var css = '';");
+        L.push('            var sheets = document.styleSheets;');
+        L.push('            for (var i = 0; i < sheets.length; i++) {');
+        L.push('                try {');
+        L.push('                    var rules = sheets[i].cssRules || sheets[i].rules;');
+        L.push('                    if (!rules) continue;');
+        L.push('                    for (var j = 0; j < rules.length; j++) {');
+        L.push('                        var r = rules[j];');
+        L.push("                        if (!r.selectorText || r.selectorText.indexOf(':has(') === -1) continue;");
+        L.push('                        var regex = /([^:]+):has\\(([^)]+(?:\\([^)]*\\))?[^)]*)\\)([^:]*)/g;');
+        L.push('                        var m;');
+        L.push('                        while ((m = regex.exec(r.selectorText)) !== null) {');
+        L.push('                            var parentSel = m[1].trim();');
+        L.push('                            var childSel = m[2].trim();');
+        L.push('                            var suffix = m[3] || "";');
+        L.push("                            var cls = '__h_' + __hasHash(parentSel + '|' + childSel);");
+        L.push('                            try {');
+        L.push('                                var parents = document.querySelectorAll(parentSel);');
+        L.push('                                for (var k = 0; k < parents.length; k++) {');
+        L.push('                                    try { if (parents[k].querySelector(childSel)) parents[k].classList.add(cls); } catch (e) {}');
+        L.push('                                }');
+        L.push('                            } catch (e) {}');
+        L.push("                            css += '.' + cls + suffix + ' { ' + r.style.cssText + ' }\\n';");
+        L.push('                        }');
+        L.push('                    }');
+        L.push('                } catch (e) {}');
+        L.push('            }');
+        L.push('            __hasStyle.textContent = css;');
+        L.push('        }');
+        L.push("        if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', __applyHas); } else { __applyHas(); }");
+        L.push('        try { var __hasTimer = null; new MutationObserver(function () { if (__hasTimer) clearTimeout(__hasTimer); __hasTimer = setTimeout(__applyHas, 200); }).observe(document.documentElement, { childList: true, subtree: true, attributes: true }); } catch (e) {}');
+        L.push('    }');
+        L.push('');
+      }
+      if (cssPatchable.indexOf('position: sticky') > -1) {
+        L.push('    // ----- position: sticky -----');
+        L.push("    if (!(typeof CSS !== 'undefined' && CSS.supports && CSS.supports('position', 'sticky'))) {");
+        L.push('        var __stickyElements = [];');
+        L.push('        function __collectSticky() {');
+        L.push('            __stickyElements = [];');
+        L.push("            var all = document.querySelectorAll('*');");
+        L.push('            for (var i = 0; i < all.length; i++) {');
+        L.push("                var st = window.getComputedStyle(all[i]).position;");
+        L.push("                if (st === 'sticky' || st === '-webkit-sticky') __stickyElements.push(all[i]);");
+        L.push('            }');
+        L.push('        }');
+        L.push('        function __updateSticky() {');
+        L.push('            for (var i = 0; i < __stickyElements.length; i++) {');
+        L.push('                var el = __stickyElements[i];');
+        L.push('                var rect = el.getBoundingClientRect();');
+        L.push('                var parent = el.parentElement;');
+        L.push('                if (!parent) continue;');
+        L.push('                var parentRect = parent.getBoundingClientRect();');
+        L.push('                if (rect.top <= 0 && parentRect.bottom > rect.height) {');
+        L.push("                    el.style.position = 'fixed'; el.style.top = '0'; el.style.width = parentRect.width + 'px';");
+        L.push('                } else {');
+        L.push("                    el.style.position = ''; el.style.top = ''; el.style.width = '';");
+        L.push('                }');
+        L.push('            }');
+        L.push('        }');
+        L.push("        if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', function () { __collectSticky(); __updateSticky(); }); } else { __collectSticky(); __updateSticky(); }");
+        L.push("        window.addEventListener('scroll', __updateSticky, { passive: true });");
+        L.push('    }');
+        L.push('');
+      }
+      var otherCss = cssPatchable.filter(function (n) { return n !== ':has() 选择器' && n !== 'position: sticky'; });
+      if (otherCss.length > 0) {
+        L.push('    // 以下 CSS 特性需要更复杂的运行时修补，此处仅列出：');
+        for (var oi = 0; oi < otherCss.length; oi++) L.push('    //   - ' + otherCss[oi]);
+        L.push('');
+      }
+    }
+
+    var cssUnpatchable = cssMissing.filter(function (n) { return !CSS_PATCHABLE[n]; });
+    if (cssUnpatchable.length > 0) {
+      L.push('    // ===== 以下 CSS 特性无法通过运行时修补（引擎限制） =====');
+      for (var ui = 0; ui < cssUnpatchable.length; ui++) L.push('    //   - ' + cssUnpatchable[ui]);
+      L.push('');
+    }
+    if (jsNoPolyfill.length > 0) {
+      L.push('    // ===== 以下 JS 特性无法补全（语法级/引擎级） =====');
+      for (var ji = 0; ji < jsNoPolyfill.length; ji++) L.push('    //   - ' + jsNoPolyfill[ji]);
+      L.push('');
+    }
+    L.push('})();');
+    return L.join('\n');
+  }
+
+  /* ===== 下载按钮（Blob 链接） ===== */
+  function setupDownloadButton() {
+    var content = generateUnifiedScript();
+    var blob = new Blob([content], { type: 'text/javascript;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var btn = $('download-btn');
+    btn.href = url;
+    btn.download = 'polyfill-unified-' + detectKernelVersion().replace(/\s+/g, '-').toLowerCase() + '.user.js';
+    btn.removeAttribute('aria-disabled');
+    btn.addEventListener('click', function () {
+      setTimeout(function () { URL.revokeObjectURL(url); }, 3000);
+    });
+  }
+
+  /* ===== 浏览器信息 ===== */
+  function renderBrowserInfo() {
+    var ua = navigator.userAgent;
+    var rows = [
+      ['User-Agent', ua],
+      ['内核', detectKernelVersion()],
+      ['Platform', navigator.platform || '—'],
+      ['语言', navigator.language || '—'],
+      ['屏幕', screen.width + ' × ' + screen.height],
+      ['DPR', String(window.devicePixelRatio || 1)],
+      ['颜色深度', screen.colorDepth + ' bit'],
+      ['在线状态', navigator.onLine ? '在线' : '离线'],
+      ['Cookie', navigator.cookieEnabled ? '启用' : '禁用'],
+      ['触摸', 'ontouchstart' in window ? '支持' : '不支持'],
+      ['最大触控点', String(navigator.maxTouchPoints || 0)],
+    ];
+    if (navigator.hardwareConcurrency) rows.push(['CPU 核心', String(navigator.hardwareConcurrency)]);
+    if (navigator.deviceMemory) rows.push(['设备内存', navigator.deviceMemory + ' GB']);
+    $('info-content').innerHTML = rows.map(function (r) {
+      return '<div><span class="label">' + r[0] + '：</span>' + escapeHtml(r[1]) + '</div>';
+    }).join('');
+  }
+
+  /* ===== 筛选 ===== */
+  function bindFilter() {
+    var bar = $('filter-bar');
+    if (!bar) return;
+    bar.addEventListener('click', function (e) {
+      var btn = e.target.closest ? e.target.closest('.filter-btn') : null;
+      if (!btn) return;
+      var btns = bar.querySelectorAll('.filter-btn');
+      for (var i = 0; i < btns.length; i++) btns[i].classList.remove('active');
+      btn.classList.add('active');
+      currentFilter = btn.getAttribute('data-filter');
+      renderResults();
+    });
+  }
+
+  /* ===== 启动 ===== */
+  async function boot() {
+    renderBrowserInfo();
+    await sleep(200);
+    await runAllTests();
+    renderResults();
+    bindFilter();
+    $('script-preview').textContent = generateUnifiedScript();
+    $('result-card').style.display = '';
+    $('detail-card').style.display = '';
+    $('fingerprint-card').style.display = '';
+    setupDownloadButton();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot);
+  } else {
+    boot();
+  }
+
+})();
+</script>
+
+</body>
+</html>
