@@ -1,0 +1,1121 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>国际象棋 · VS Code (对弈引擎+日志)</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        :root {
+            --bg: #1e1e1e;
+            --panel: #252526;
+            --tab: #2d2d2d;
+            --border: #3c3c3c;
+            --text: #ccc;
+            --text-muted: #7a7a7a;
+            --accent: #007acc;
+            --light-sq: #c8c4bc;
+            --dark-sq: #5b5a56;
+            --legal-dot: rgba(0,0,0,0.28);
+            --legal-cap: rgba(200,50,50,0.7);
+            --last-mv-bg-light: rgba(0,122,180,0.22);
+            --last-mv-bg-dark: rgba(0,122,180,0.28);
+            --check-bg: rgba(215,50,50,0.48);
+            --notif-bg: #252526;
+            --notif-border: #3c3c3c;
+            --notif-info: #007acc;
+            --notif-warn: #cca700;
+            --notif-err: #e05555;
+            --font: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            --mono: 'Cascadia Code', 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+            --radius-sm: 3px;
+        }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body {
+            background: #1a1a1a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: var(--font);
+            -webkit-font-smoothing: antialiased;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            padding: 12px;
+        }
+        .app {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            max-width: 500px;
+            min-width: 320px;
+        }
+        .title-bar {
+            background: var(--tab);
+            border: 1px solid var(--border);
+            border-bottom: none;
+            border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+            padding: 8px 14px;
+            display: flex;
+            align-items: center;
+            gap: 7px;
+        }
+        .title-bar .icon { color: var(--accent); font-size: 14px; }
+        .title-bar .name { color: var(--text); font-size: 12px; font-family: var(--mono); letter-spacing: 0.02em; }
+        .title-bar .name .ext { color: var(--text-muted); }
+        .title-bar .dot {
+            width: 7px; height: 7px; border-radius: 50%;
+            background: #5cb85c; margin-left: auto; flex-shrink: 0;
+            transition: background 0.15s;
+        }
+        .title-bar .dot.warn { background: #cca700; animation: pulse 1s infinite; }
+        .title-bar .dot.err  { background: #e05555; animation: pulse 0.6s infinite; }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.25} }
+        .canvas-wrap {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+            padding: 10px;
+            display: flex;
+            justify-content: center;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            max-width: 460px;
+            aspect-ratio: 1/1;
+            border-radius: 1px;
+            cursor: pointer;
+            touch-action: manipulation;
+        }
+        canvas.thinking { cursor: default; opacity: 0.9; }
+        .status-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 5px 12px;
+            font-size: 10px;
+            color: var(--text-muted);
+            font-family: var(--mono);
+            background: var(--tab);
+            border: 1px solid var(--border);
+            border-top: none;
+            border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+            letter-spacing: 0.03em;
+        }
+        .status-bar .tdot { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
+        .status-bar .tdot.w { background:#f0ece6; box-shadow:0 0 3px rgba(255,255,255,0.4); }
+        .status-bar .tdot.b { background:#3a3733; border:1px solid #777; }
+        .status-bar .engine-status {
+            color: #cca700;
+            font-style: italic;
+        }
+        .status-bar .reset-btn {
+            margin-left: auto; color:#555; background:none; border:none;
+            font-family: var(--mono); font-size:10px; cursor:pointer;
+            letter-spacing:0.03em; padding:2px 5px; border-radius:2px;
+            transition: color 0.12s;
+        }
+        .status-bar .reset-btn:hover { color:#ddd; background:rgba(255,255,255,0.04); }
+        .notif-container {
+            position: fixed; top:10px; right:10px; z-index:200;
+            display: flex; flex-direction: column; gap:6px; pointer-events:none;
+            max-width:340px; width:auto;
+        }
+        .notif {
+            pointer-events:auto;
+            position: relative;
+            background: var(--notif-bg);
+            border: 1px solid var(--notif-border);
+            border-left: 3px solid var(--notif-info);
+            border-radius: var(--radius-sm);
+            padding: 9px 30px 9px 11px;
+            display: block;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.45);
+            animation: slideIn 0.2s cubic-bezier(0.16,1,0.3,1);
+            font-size:12px; color:var(--text);
+            line-height: 1.4;
+            word-wrap: break-word;
+            width: fit-content;
+            max-width: 100%;
+        }
+        .notif.warn { border-left-color: var(--notif-warn); }
+        .notif.err  { border-left-color: var(--notif-err); }
+        .notif.out { animation: slideOut 0.22s cubic-bezier(0.55,0,1,0.45) forwards; }
+        .notif.engine-log {
+            border-left-color: #6c6c6c;
+            background: #1e1e1e;
+            font-family: var(--mono);
+            font-size: 10px;
+            max-height: 120px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+            pointer-events: auto;
+        }
+        @keyframes slideIn { from{transform:translateX(110%);opacity:0} to{transform:translateX(0);opacity:1} }
+        @keyframes slideOut { from{transform:translateX(0);opacity:1} to{transform:translateX(110%);opacity:0} }
+        .notif .close {
+            position: absolute;
+            top: 6px; right: 6px;
+            width: 18px; height: 18px;
+            border-radius: 2px;
+            border: none;
+            background: transparent;
+            color: #999;
+            cursor: pointer;
+            font-size: 14px;
+            line-height: 1;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            transition: background 0.1s, color 0.1s;
+        }
+        .notif .close:hover { background: rgba(255,255,255,0.1); color: #ddd; }
+        .promo-overlay {
+            position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:100;
+            display:flex; align-items:center; justify-content:center;
+            animation: fadeIn 0.1s;
+        }
+        @keyframes fadeIn { from{opacity:0} to{opacity:1} }
+        .promo-dlg {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 12px 16px;
+            display: flex; gap:8px; flex-direction:column; align-items:center;
+            box-shadow: 0 6px 22px rgba(0,0,0,0.55);
+        }
+        .promo-dlg .lbl { color:var(--text-muted); font-size:10px; text-transform:uppercase; letter-spacing:0.05em; }
+        .promo-opts { display:flex; gap:4px; }
+        .promo-opts button {
+            width:44px; height:44px; border-radius: var(--radius-sm);
+            border:2px solid var(--border); background:var(--tab);
+            cursor:pointer; font-size:22px;
+            transition:all 0.1s; display:flex; align-items:center; justify-content:center;
+            padding:0; line-height:1;
+            font-family: "Font Awesome 6 Free";
+            font-weight: 900;
+        }
+        .promo-opts button:hover { background:#3a3a3a; border-color:var(--accent); }
+        .promo-opts button:active { background:var(--accent); transform:scale(0.9); }
+        @media (max-width:420px) {
+            .canvas-wrap { padding:6px; }
+            .promo-opts button { width:38px; height:38px; font-size:18px; }
+            .notif { font-size:11px; padding:7px 28px 7px 9px; }
+        }
+    </style>
+</head>
+<body>
+<div class="app">
+    <div class="title-bar">
+        <span class="icon"><i class="fas fa-chess-king"></i></span>
+        <span class="name">chess<span class="ext">.game</span></span>
+        <span class="dot" id="statusDot"></span>
+    </div>
+    <div class="canvas-wrap">
+        <canvas id="boardCanvas"></canvas>
+    </div>
+    <div class="status-bar">
+        <span class="tdot w" id="turnDot"></span>
+        <span id="turnText">白方走棋</span>
+        <span id="moveCount" style="color:#555;">第1步</span>
+        <span class="engine-status" id="engineStatus"></span>
+        <button class="reset-btn" id="resetBtn">⟳ 重置</button>
+    </div>
+</div>
+<div class="notif-container" id="notifContainer"></div>
+<div class="promo-overlay" id="promoOverlay" style="display:none;">
+    <div class="promo-dlg">
+        <span class="lbl">选择升变棋子</span>
+        <div class="promo-opts" id="promoOpts"></div>
+    </div>
+</div>
+
+<script>
+(function() {
+    const FA_CHESS = {
+        king:   '\uf43f',
+        queen:  '\uf445',
+        rook:   '\uf447',
+        bishop: '\uf43a',
+        knight: '\uf441',
+        pawn:   '\uf443'
+    };
+    const PROMO_TYPES = ['queen','rook','bishop','knight'];
+    const COLS = 'abcdefgh';
+    const DIR_KNIGHT = [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]];
+    const DIR_KING   = [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]];
+    const DIR_SLIDE  = [[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[-1,1],[1,-1],[1,1]];
+
+    const canvas = document.getElementById('boardCanvas');
+    const ctx = canvas.getContext('2d');
+    const statusDot = document.getElementById('statusDot');
+    const turnDot = document.getElementById('turnDot');
+    const turnText = document.getElementById('turnText');
+    const moveCountEl = document.getElementById('moveCount');
+    const engineStatusEl = document.getElementById('engineStatus');
+    const notifContainer = document.getElementById('notifContainer');
+    const promoOverlay = document.getElementById('promoOverlay');
+    const promoOpts = document.getElementById('promoOpts');
+    const resetBtn = document.getElementById('resetBtn');
+
+    let engineLogEl = null;
+    let engineLogLines = [];
+
+    function initEngineLog() {
+        engineLogEl = document.createElement('div');
+        engineLogEl.className = 'notif engine-log';
+        engineLogEl.innerHTML = '<span style="color:#888;">[引擎日志] 初始化...</span>';
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'close';
+        closeBtn.textContent = '✕';
+        closeBtn.onclick = () => { engineLogEl.style.display = 'none'; };
+        engineLogEl.appendChild(closeBtn);
+        notifContainer.insertBefore(engineLogEl, notifContainer.firstChild);
+    }
+
+    function appendEngineLog(text) {
+        if (!engineLogEl) return;
+        const now = new Date();
+        const time = now.toTimeString().slice(0,8);
+        const line = `[${time}] ${text}`;
+        engineLogLines.push(line);
+        if (engineLogLines.length > 6) engineLogLines.shift();
+        engineLogEl.childNodes[0].textContent = engineLogLines.join('\n');
+    }
+
+    function setEngineStatusText(text) {
+        engineStatusEl.textContent = text;
+    }
+
+    let board = new Array(64).fill(null);
+    let turn = 'white';
+    let castling = { wK:true, wQ:true, bK:true, bQ:true };
+    let epTarget = -1;
+    let halfMoves = 0;
+    let fullMove = 1;
+    let selIdx = -1;
+    let legalMoves = [];
+    let lastFrom = -1, lastTo = -1;
+    let gameOver = false;
+    let gameResult = null;
+    let promoPending = null;
+    let wkIdx = 60, bkIdx = 4;
+    let posHistory = new Map();
+    let animPiece = null, animRook = null, rafId = null;
+
+    let engineWorker = null;
+    let engineReady = false;
+    let engineThinking = false;
+    let moveHistory = [];
+    let pendingEngineMove = false;
+    let engineTimeout = null;
+    let engineInitTimer = null;
+
+    let audioCtx = null;
+    function ensureAudio() {
+        if (!audioCtx) try { audioCtx = new (window.AudioContext||window.webkitAudioContext)(); } catch(e){}
+        if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+    }
+    function beep(f,d,t='sine',v=0.08) {
+        if(!audioCtx) return;
+        try {
+            const o = audioCtx.createOscillator();
+            const g = audioCtx.createGain();
+            o.type = t; o.frequency.setValueAtTime(f, audioCtx.currentTime);
+            g.gain.setValueAtTime(v, audioCtx.currentTime);
+            g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + d);
+            o.connect(g); g.connect(audioCtx.destination);
+            o.start(); o.stop(audioCtx.currentTime + d);
+        } catch(e){}
+    }
+    function sfxMove()    { beep(660,0.04,'sine',0.07); }
+    function sfxCapture() { beep(260,0.07,'triangle',0.12); setTimeout(()=>beep(160,0.05,'triangle',0.08),30); }
+    function sfxCheck()   { beep(480,0.08,'square',0.08); setTimeout(()=>beep(720,0.09,'square',0.08),60); }
+    function sfxPromote() { beep(340,0.05,'sine',0.07); setTimeout(()=>beep(520,0.05,'sine',0.07),40); setTimeout(()=>beep(760,0.06,'sine',0.09),80); }
+    function sfxEnd()     { beep(180,0.18,'triangle',0.12); setTimeout(()=>beep(280,0.22,'triangle',0.1),130); }
+
+    function idx(r,c) { return r*8 + c; }
+    function rc(i)    { return { r:Math.floor(i/8), c:i%8 }; }
+    function inBounds(r,c) { return r>=0 && r<8 && c>=0 && c<8; }
+
+    // ========== 引擎通信 (已修复) ==========
+    function initEngine() {
+        initEngineLog();
+        appendEngineLog('正在创建 Worker...');
+        if (engineWorker) {
+            engineWorker.terminate();
+        }
+        try {
+            engineWorker = new Worker('stockfish-18-lite-single.js');
+        } catch (e) {
+            appendEngineLog('Worker 创建失败: ' + e.message);
+            notify('引擎 Worker 创建失败，请检查文件名和服务器','err');
+            setEngineStatusText('引擎加载失败');
+            return;
+        }
+        engineWorker.onmessage = handleEngineMessage;
+        engineWorker.onerror = (e) => {
+            appendEngineLog('引擎 Worker 错误: ' + (e.message || '未知错误'));
+            notify('引擎运行错误，查看日志','err');
+            engineReady = false;
+            engineThinking = false;
+            updateEngineStatus();
+        };
+
+        appendEngineLog('发送 uci 命令...');
+        sendToEngine('uci');
+        sendToEngine('setoption name Hash value 64');
+        sendToEngine('isready');
+
+        clearEngineInitTimer();
+        engineInitTimer = setTimeout(() => {
+            if (!engineReady) {
+                appendEngineLog('引擎初始化超时（5秒未就绪）');
+                notify('引擎初始化超时，请检查文件路径或服务器 MIME 类型','err');
+                setEngineStatusText('引擎超时');
+            }
+        }, 5000);
+    }
+
+    function clearEngineInitTimer() {
+        if (engineInitTimer) {
+            clearTimeout(engineInitTimer);
+            engineInitTimer = null;
+        }
+    }
+
+    function sendToEngine(cmd) {
+        // ★ 修复：只检查 Worker 是否存在
+        if (engineWorker) {
+            engineWorker.postMessage(cmd);
+            appendEngineLog('→ ' + cmd);
+        } else {
+            appendEngineLog('未能发送(Worker未创建): ' + cmd);
+        }
+    }
+
+    function handleEngineMessage(e) {
+        const msg = e.data;
+        if (typeof msg !== 'string') return;
+
+        const short = msg.length > 60 ? msg.slice(0,60)+'...' : msg;
+        appendEngineLog('← ' + short);
+
+        if (msg.includes('readyok')) {
+            engineReady = true;
+            clearEngineInitTimer();
+            setEngineStatusText('引擎就绪');
+            updateEngineStatus();
+            return;
+        }
+
+        if (msg.includes('uciok')) {
+            appendEngineLog('UCI 协议确认');
+            return;
+        }
+
+        if (msg.startsWith('bestmove')) {
+            clearEngineTimeout();
+            const parts = msg.split(' ');
+            const best = parts[1];
+            if (best && best !== '(none)') {
+                executeEngineMove(best);
+            } else {
+                engineThinking = false;
+                updateEngineStatus();
+            }
+            return;
+        }
+    }
+
+    function setEngineTimeout() {
+        clearEngineTimeout();
+        engineTimeout = setTimeout(() => {
+            if (engineThinking) {
+                appendEngineLog('引擎思考超时，强制停止');
+                notify('引擎响应超时，请尝试重置','err');
+                engineThinking = false;
+                updateEngineStatus();
+                sendToEngine('stop');
+            }
+        }, 15000);
+    }
+
+    function clearEngineTimeout() {
+        if (engineTimeout) {
+            clearTimeout(engineTimeout);
+            engineTimeout = null;
+        }
+    }
+
+    function updateEngineStatus() {
+        if (!engineReady) {
+            setEngineStatusText('引擎加载中…');
+            statusDot.className = 'dot warn';
+        } else if (engineThinking) {
+            setEngineStatusText('引擎思考中…');
+            statusDot.className = 'dot warn';
+        } else {
+            setEngineStatusText('');
+            statusDot.className = 'dot';
+        }
+        if (engineThinking || !engineReady) {
+            canvas.classList.add('thinking');
+        } else {
+            canvas.classList.remove('thinking');
+        }
+    }
+
+    function requestEngineMove() {
+        if (gameOver || turn !== 'black' || !engineReady || engineThinking) return;
+        engineThinking = true;
+        pendingEngineMove = true;
+        updateEngineStatus();
+
+        let posCmd = 'position startpos';
+        if (moveHistory.length > 0) {
+            posCmd += ' moves ' + moveHistory.join(' ');
+        }
+        sendToEngine(posCmd);
+        sendToEngine('go movetime 2000');
+        setEngineTimeout();
+    }
+
+    function executeEngineMove(uci) {
+        const fromCol = uci.charCodeAt(0) - 97;
+        const fromRow = 8 - parseInt(uci[1]);
+        const toCol = uci.charCodeAt(2) - 97;
+        const toRow = 8 - parseInt(uci[3]);
+        const promoChar = uci[4];
+
+        const fromIdx = idx(fromRow, fromCol);
+        const toIdx = idx(toRow, toCol);
+        const piece = board[fromIdx];
+        if (!piece) {
+            appendEngineLog('无效的引擎走法: ' + uci);
+            notify('引擎走法异常','err');
+            engineThinking = false;
+            updateEngineStatus();
+            return;
+        }
+
+        let move = legalMoves.find(m => m.toIdx === toIdx && (!m.isPromo || (promoChar && PROMO_TYPES[0][0] === promoChar)));
+        if (!move) {
+            move = {
+                toIdx: toIdx,
+                isCap: !!board[toIdx],
+                isEP: (piece.type === 'pawn' && toIdx === epTarget),
+                isPromo: !!promoChar,
+                promoType: promoChar ? {q:'queen', r:'rook', b:'bishop', n:'knight'}[promoChar] : undefined,
+                isCastle: false
+            };
+            if (piece.type === 'king' && Math.abs(fromCol - toCol) === 2) {
+                move.isCastle = true;
+                if (toCol === 6) {
+                    move.rookFrom = idx(fromRow, 7);
+                    move.rookTo = idx(fromRow, 5);
+                } else {
+                    move.rookFrom = idx(fromRow, 0);
+                    move.rookTo = idx(fromRow, 3);
+                }
+            }
+        }
+
+        appendEngineLog('执行引擎走法: ' + uci);
+        executeMove(fromIdx, move, move.promoType);
+        moveHistory.push(uci);
+        engineThinking = false;
+        pendingEngineMove = false;
+        updateEngineStatus();
+    }
+
+    // ========== 棋盘逻辑 ==========
+    function isAttackedBy(i, attackerColor) {
+        const {r,c} = rc(i);
+        const opp = attackerColor;
+        const pawnDr = opp==='white' ? 1 : -1;
+        for (const dc of [-1,1]) {
+            const pr = r+pawnDr, pc = c+dc;
+            if(inBounds(pr,pc)) { const p=board[idx(pr,pc)]; if(p&&p.type==='pawn'&&p.color===opp) return true; }
+        }
+        for (const [dr,dc] of DIR_KNIGHT) {
+            const nr=r+dr, nc=c+dc;
+            if(inBounds(nr,nc)) { const p=board[idx(nr,nc)]; if(p&&p.type==='knight'&&p.color===opp) return true; }
+        }
+        for (const [dr,dc] of DIR_KING) {
+            const nr=r+dr, nc=c+dc;
+            if(inBounds(nr,nc)) { const p=board[idx(nr,nc)]; if(p&&p.type==='king'&&p.color===opp) return true; }
+        }
+        for (let di=0; di<8; di++) {
+            const [dr,dc] = DIR_SLIDE[di];
+            let nr=r+dr, nc=c+dc;
+            while(inBounds(nr,nc)) {
+                const p=board[idx(nr,nc)];
+                if(p) {
+                    if(p.color===opp) {
+                        const ok = (di<4) ? (p.type==='rook'||p.type==='queen') : (p.type==='bishop'||p.type==='queen');
+                        if(ok) return true;
+                    }
+                    break;
+                }
+                nr+=dr; nc+=dc;
+            }
+        }
+        return false;
+    }
+
+    function isKingInCheck(color) {
+        const ki = color==='white' ? wkIdx : bkIdx;
+        return isAttackedBy(ki, color==='white'?'black':'white');
+    }
+
+    function pseudoMoves(fromIdx) {
+        const piece = board[fromIdx];
+        if(!piece) return [];
+        const {r,c} = rc(fromIdx);
+        const color = piece.color, opp = color==='white'?'black':'white';
+        const moves = [];
+
+        function add(toIdx, extra={}) {
+            moves.push({ toIdx, isCap: !!board[toIdx], ...extra });
+        }
+
+        if(piece.type === 'pawn') {
+            const dir = color==='white' ? -1 : 1;
+            const startR = color==='white' ? 6 : 1;
+            const promoR = color==='white' ? 0 : 7;
+            const fwd = idx(r+dir, c);
+            if(inBounds(r+dir,c) && !board[fwd]) {
+                moves.push({ toIdx:fwd, isCap:false, isPromo: (r+dir===promoR) });
+                const fwd2 = idx(r+2*dir, c);
+                if(r===startR && !board[fwd2]) moves.push({ toIdx:fwd2, isCap:false, isDouble:true });
+            }
+            for(const dc of [-1,1]) {
+                if(inBounds(r+dir, c+dc)) {
+                    const ti = idx(r+dir, c+dc);
+                    const tgt = board[ti];
+                    if(tgt && tgt.color===opp) moves.push({ toIdx:ti, isCap:true, isPromo: (r+dir===promoR) });
+                    if(epTarget === ti) moves.push({ toIdx:ti, isCap:true, isEP:true });
+                }
+            }
+        } else if(piece.type === 'knight') {
+            for(const [dr,dc] of DIR_KNIGHT) {
+                const nr=r+dr, nc=c+dc;
+                if(inBounds(nr,nc)) {
+                    const ti = idx(nr,nc);
+                    if(!board[ti] || board[ti].color===opp) add(ti);
+                }
+            }
+        } else if(piece.type === 'king') {
+            for(const [dr,dc] of DIR_KING) {
+                const nr=r+dr, nc=c+dc;
+                if(inBounds(nr,nc)) {
+                    const ti = idx(nr,nc);
+                    if(!board[ti] || board[ti].color===opp) add(ti);
+                }
+            }
+            const homeR = color==='white' ? 7 : 0;
+            if(r===homeR && c===4) {
+                const ks = color==='white'?'wK':'bK', qs = color==='white'?'wQ':'bQ';
+                if(castling[ks] && !board[idx(homeR,5)] && !board[idx(homeR,6)] &&
+                    board[idx(homeR,7)]?.type==='rook' && board[idx(homeR,7)]?.color===color &&
+                    !isAttackedBy(idx(homeR,4),opp) && !isAttackedBy(idx(homeR,5),opp) && !isAttackedBy(idx(homeR,6),opp))
+                {
+                    moves.push({ toIdx:idx(homeR,6), isCap:false, isCastle:true, rookFrom:idx(homeR,7), rookTo:idx(homeR,5) });
+                }
+                if(castling[qs] && !board[idx(homeR,1)] && !board[idx(homeR,2)] && !board[idx(homeR,3)] &&
+                    board[idx(homeR,0)]?.type==='rook' && board[idx(homeR,0)]?.color===color &&
+                    !isAttackedBy(idx(homeR,4),opp) && !isAttackedBy(idx(homeR,3),opp) && !isAttackedBy(idx(homeR,2),opp))
+                {
+                    moves.push({ toIdx:idx(homeR,2), isCap:false, isCastle:true, rookFrom:idx(homeR,0), rookTo:idx(homeR,3) });
+                }
+            }
+        } else {
+            const slideDirs = (piece.type==='bishop') ? [4,5,6,7] : (piece.type==='rook') ? [0,1,2,3] : [0,1,2,3,4,5,6,7];
+            for(const di of slideDirs) {
+                const [dr,dc] = DIR_SLIDE[di];
+                let nr=r+dr, nc=c+dc;
+                while(inBounds(nr,nc)) {
+                    const ti = idx(nr,nc);
+                    const tgt = board[ti];
+                    if(tgt) { if(tgt.color===opp) add(ti); break; }
+                    add(ti);
+                    nr+=dr; nc+=dc;
+                }
+            }
+        }
+        return moves;
+    }
+
+    function simulate(fromIdx, move) {
+        const piece = board[fromIdx];
+        const color = piece.color;
+        const toIdx = move.toIdx;
+        const saved = {};
+        const positions = [fromIdx, toIdx];
+        saved[fromIdx] = board[fromIdx];
+        saved[toIdx] = board[toIdx];
+        if(move.isEP) {
+            const epCapIdx = color==='white' ? toIdx+8 : toIdx-8;
+            positions.push(epCapIdx);
+            saved[epCapIdx] = board[epCapIdx];
+            board[epCapIdx] = null;
+        }
+        if(move.isCastle) {
+            positions.push(move.rookFrom, move.rookTo);
+            saved[move.rookFrom] = board[move.rookFrom];
+            saved[move.rookTo] = board[move.rookTo];
+            board[move.rookTo] = board[move.rookFrom];
+            board[move.rookFrom] = null;
+        }
+        board[toIdx] = piece;
+        board[fromIdx] = null;
+
+        const oldWk = wkIdx, oldBk = bkIdx;
+        if(piece.type==='king') {
+            if(color==='white') wkIdx = toIdx;
+            else bkIdx = toIdx;
+        }
+        const inCheck = isKingInCheck(color);
+        for(const pos of positions) board[pos] = saved[pos]!==undefined ? saved[pos] : null;
+        wkIdx = oldWk; bkIdx = oldBk;
+        return !inCheck;
+    }
+
+    function getLegalMoves(fromIdx) {
+        const piece = board[fromIdx];
+        if(!piece || piece.color !== turn) return [];
+        return pseudoMoves(fromIdx).filter(m => simulate(fromIdx, m));
+    }
+
+    function hasAnyLegal(color) {
+        for(let i=0;i<64;i++) if(board[i] && board[i].color===color && getLegalMoves(i).length>0) return true;
+        return false;
+    }
+
+    function idxToUci(i) {
+        const {r, c} = rc(i);
+        return COLS[c] + (8 - r);
+    }
+
+    function executeMove(fromIdx, move, promoType) {
+        const piece = board[fromIdx];
+        const color = piece.color;
+        const toIdx = move.toIdx;
+        const captured = board[toIdx];
+        if(move.isEP) board[color==='white'?toIdx+8:toIdx-8] = null;
+        if(move.isCastle) {
+            board[move.rookTo] = board[move.rookFrom];
+            board[move.rookFrom] = null;
+        }
+        board[toIdx] = move.isPromo&&promoType ? {type:promoType, color} : piece;
+        board[fromIdx] = null;
+
+        if(piece.type==='king') {
+            if(color==='white') wkIdx = toIdx; else bkIdx = toIdx;
+        }
+        if(piece.type==='rook') {
+            if(color==='white') { if(fromIdx===idx(7,0)) castling.wQ=false; if(fromIdx===idx(7,7)) castling.wK=false; }
+            else { if(fromIdx===idx(0,0)) castling.bQ=false; if(fromIdx===idx(0,7)) castling.bK=false; }
+        }
+        if(piece.type==='king') {
+            if(color==='white') { castling.wK=false; castling.wQ=false; }
+            else { castling.bK=false; castling.bQ=false; }
+        }
+        if(captured && captured.type==='rook') {
+            if(captured.color==='white') { if(toIdx===idx(7,0)) castling.wQ=false; if(toIdx===idx(7,7)) castling.wK=false; }
+            else { if(toIdx===idx(0,0)) castling.bQ=false; if(toIdx===idx(0,7)) castling.bK=false; }
+        }
+
+        const uciMove = idxToUci(fromIdx) + idxToUci(toIdx) + (move.isPromo && promoType ? promoType[0] : '');
+        if (color === 'white') {
+            moveHistory.push(uciMove);
+        }
+
+        epTarget = move.isDouble ? (color==='white'?fromIdx-8:fromIdx+8) : -1;
+        halfMoves = (piece.type==='pawn'||move.isCap||move.isEP) ? 0 : halfMoves+1;
+        if(color==='black') fullMove++;
+        turn = color==='white'?'black':'white';
+        lastFrom = fromIdx; lastTo = toIdx;
+        updatePosHistory();
+
+        if(move.isPromo) sfxPromote();
+        else if(move.isCap||move.isEP) sfxCapture();
+        else sfxMove();
+
+        animPiece = { idx:toIdx, startTime:performance.now(), fromScale:0.65 };
+        if(move.isCastle) animRook = { idx:move.rookTo, startTime:performance.now() };
+
+        checkGameEnd();
+        if(!gameOver && isKingInCheck(turn)) sfxCheck();
+        render();
+        updateUI();
+
+        if (!gameOver && turn === 'black' && engineReady && !engineThinking) {
+            requestEngineMove();
+        }
+    }
+
+    function checkGameEnd() {
+        if(gameOver) return;
+        const col = turn;
+        if(!hasAnyLegal(col)) {
+            gameOver = true;
+            if(isKingInCheck(col)) {
+                gameResult = col==='white'?'b':'w';
+                notify(`<strong>将杀！</strong>${gameResult==='w'?'白方':'黑方'}获胜`,'err');
+            } else {
+                gameResult = 'draw';
+                notify('<strong>逼和</strong> — 无合法移动','warn');
+            }
+            sfxEnd(); return;
+        }
+        if(halfMoves>=100) { gameOver=true; gameResult='draw'; notify('<strong>50步规则</strong> — 和棋','warn'); sfxEnd(); return; }
+        if((posHistory.get(getPosKey())||0)>=3) { gameOver=true; gameResult='draw'; notify('<strong>三次重复</strong> — 和棋','warn'); sfxEnd(); return; }
+        if(insufficientMaterial()) { gameOver=true; gameResult='draw'; notify('<strong>子力不足</strong> — 和棋','warn'); sfxEnd(); return; }
+        if(isKingInCheck(turn)) notify(`<strong>将军！</strong>${turn==='white'?'白方':'黑方'}王被攻击`,'warn');
+    }
+
+    function insufficientMaterial() {
+        const pieces = [];
+        for(let i=0;i<64;i++) if(board[i]) pieces.push(board[i]);
+        if(pieces.length===2) return true;
+        if(pieces.length===3) { const nk=pieces.find(p=>p.type!=='king'); if(nk&&(nk.type==='bishop'||nk.type==='knight')) return true; }
+        if(pieces.length===4) {
+            const bishops = pieces.filter(p=>p.type==='bishop');
+            if(bishops.length===2 && bishops[0].color!==bishops[1].color) {
+                const i1=pieces.indexOf(bishops[0]), i2=pieces.indexOf(bishops[1]);
+                if((Math.floor(i1/8)+i1%8)%2 === (Math.floor(i2/8)+i2%8)%2) return true;
+            }
+        }
+        return false;
+    }
+
+    function getPosKey() {
+        let k='';
+        for(let r=0;r<8;r++) {
+            let e=0;
+            for(let c=0;c<8;c++) {
+                const p=board[idx(r,c)];
+                if(p) { if(e){k+=e;e=0;} k+=p.color==='white'?p.type[0].toUpperCase():p.type[0]; }
+                else e++;
+            }
+            if(e) k+=e;
+            if(r<7) k+='/';
+        }
+        k+=' '+turn[0]+' ';
+        let cr='';
+        if(castling.wK) cr+='K'; if(castling.wQ) cr+='Q';
+        if(castling.bK) cr+='k'; if(castling.bQ) cr+='q';
+        k+=(cr||'-')+' ';
+        k+=epTarget>=0 ? COLS[epTarget%8]+(8-Math.floor(epTarget/8)) : '-';
+        return k;
+    }
+
+    function updatePosHistory() { const key = getPosKey(); posHistory.set(key, (posHistory.get(key)||0)+1); }
+
+    function updateUI() {
+        if(gameOver) {
+            turnDot.className = 'tdot';
+            turnDot.style.background = gameResult==='draw' ? '#888' : (gameResult==='w'?'#f0ece6':'#3a3733');
+            turnText.textContent = gameResult==='draw'?'和棋':(gameResult==='w'?'白方获胜':'黑方获胜');
+        } else {
+            turnDot.className = 'tdot '+(turn==='white'?'w':'b');
+            turnDot.style.background = '';
+            turnText.textContent = turn==='white'?'白方走棋':'黑方走棋';
+        }
+        moveCountEl.textContent = '第'+fullMove+'步';
+        updateEngineStatus();
+    }
+
+    let notifTimers = [];
+    function notify(msg, type='info') {
+        const el = document.createElement('div');
+        el.className = 'notif '+(type==='warn'?'warn':type==='err'?'err':'');
+        el.innerHTML = `<span style="display:block; padding-right:2px;">${msg}</span><button class="close">✕</button>`;
+        el.querySelector('.close').onclick = () => dismissNotif(el);
+        notifContainer.appendChild(el);
+        const t = setTimeout(()=>dismissNotif(el), 3000);
+        notifTimers.push({el,t});
+        if(notifContainer.children.length > 5) dismissNotif(notifContainer.children[1]); // 保留日志
+    }
+    function dismissNotif(el) {
+        if(!el || el.classList.contains('out')) return;
+        el.classList.add('out');
+        notifTimers = notifTimers.filter(n=>{ if(n.el===el){clearTimeout(n.t);return false;} return true; });
+        setTimeout(()=>{ if(el.parentNode) el.remove(); }, 250);
+    }
+    function clearNotifs() {
+        [...notifContainer.children].forEach(child => {
+            if (child !== engineLogEl) dismissNotif(child);
+        });
+        notifTimers.forEach(n=>clearTimeout(n.t));
+        notifTimers = [];
+    }
+
+    function showPromo(fromIdx, toIdx, color) {
+        promoPending = { fromIdx, toIdx, color };
+        promoOpts.innerHTML = '';
+        for(const t of PROMO_TYPES) {
+            const btn = document.createElement('button');
+            btn.textContent = FA_CHESS[t];
+            btn.style.color = color === 'white' ? '#faf3e0' : '#1a1008';
+            btn.style.textShadow = color === 'white' ? '2px 2px 0 #b8956e' : '2px 2px 0 #8a724b';
+            btn.onclick = () => {
+                promoOverlay.style.display = 'none';
+                const p = promoPending;
+                promoPending = null;
+                executeMove(p.fromIdx, { toIdx:p.toIdx, isCap:!!board[p.toIdx], isPromo:true }, t);
+                selIdx = -1; legalMoves = []; updateUI();
+            };
+            promoOpts.appendChild(btn);
+        }
+        promoOverlay.style.display = 'flex';
+    }
+    promoOverlay.addEventListener('click', e => { if(e.target===promoOverlay){} });
+
+    function getCanvasLayout() {
+        const rect = canvas.getBoundingClientRect();
+        const dpr = Math.min(window.devicePixelRatio||1, 2);
+        const w = rect.width, h = rect.height, size = Math.min(w,h);
+        return { w, h, size, ox:(w-size)/2, oy:(h-size)/2, sq:size/8, dpr };
+    }
+    function setupCanvas() {
+        const rect = canvas.getBoundingClientRect();
+        const dpr = Math.min(window.devicePixelRatio||1, 2);
+        canvas.width = rect.width * dpr;
+        canvas.height = rect.height * dpr;
+        ctx.setTransform(1,0,0,1,0,0);
+        ctx.scale(dpr, dpr);
+    }
+    function render() {
+        if(rafId) return;
+        rafId = requestAnimationFrame(()=>{
+            rafId = null;
+            setupCanvas();
+            const { w, h, ox, oy, sq } = getCanvasLayout();
+            ctx.clearRect(0,0,w,h);
+            const now = performance.now();
+
+            let pieceAnimDone = false, rookAnimDone = false;
+            if(animPiece && now - animPiece.startTime >= 180) pieceAnimDone = true;
+            if(animRook && now - animRook.startTime >= 180) rookAnimDone = true;
+
+            for(let r=0; r<8; r++) {
+                for(let c=0; c<8; c++) {
+                    const x = ox + c*sq, y = oy + r*sq;
+                    const i = idx(r,c);
+                    const light = (r+c)%2===0;
+                    let fill = light ? '#c8c4bc' : '#5b5a56';
+                    if(i===lastFrom || i===lastTo) {
+                        fill = light ? 'rgba(0,122,180,0.22)' : 'rgba(0,122,180,0.28)';
+                    }
+                    if(i===selIdx) fill = '#007acc';
+                    if(!gameOver && isKingInCheck(turn)) {
+                        const ki = turn==='white'?wkIdx:bkIdx;
+                        if(i===ki) fill = 'rgba(215,50,50,0.55)';
+                    }
+                    ctx.fillStyle = fill;
+                    ctx.fillRect(x,y,sq,sq);
+
+                    const lm = legalMoves.find(m=>m.toIdx===i);
+                    if(lm) {
+                        const cx = x+sq/2, cy = y+sq/2;
+                        if(lm.isCap||lm.isEP) {
+                            ctx.strokeStyle = 'rgba(200,50,50,0.7)';
+                            ctx.lineWidth = sq*0.08;
+                            ctx.beginPath(); ctx.arc(cx,cy,sq*0.38,0,Math.PI*2); ctx.stroke();
+                        } else {
+                            ctx.fillStyle = 'rgba(0,0,0,0.25)';
+                            ctx.beginPath(); ctx.arc(cx,cy,sq*0.12,0,Math.PI*2); ctx.fill();
+                        }
+                    }
+
+                    const isPieceAnimTarget = animPiece && animPiece.idx === i;
+                    const isRookAnimTarget = animRook && animRook.idx === i;
+                    if ((!isPieceAnimTarget || pieceAnimDone) && (!isRookAnimTarget || rookAnimDone)) {
+                        const piece = board[i];
+                        if(piece) drawPiece(ctx, piece, x+sq/2, y+sq/2, sq*0.75);
+                    }
+                }
+            }
+
+            if(animPiece && !pieceAnimDone) {
+                const {r,c} = rc(animPiece.idx);
+                const x = ox + c*sq + sq/2, y = oy + r*sq + sq/2;
+                const elapsed = now - animPiece.startTime;
+                const t = Math.min(elapsed/180, 1);
+                const scale = animPiece.fromScale + (1-animPiece.fromScale) * t;
+                ctx.save(); ctx.translate(x,y); ctx.scale(scale,scale);
+                drawPiece(ctx, board[animPiece.idx], 0,0, sq*0.75);
+                ctx.restore();
+            } else if(animPiece && pieceAnimDone) animPiece = null;
+
+            if(animRook && !rookAnimDone) {
+                const {r,c} = rc(animRook.idx);
+                const x = ox + c*sq + sq/2, y = oy + r*sq + sq/2;
+                const elapsed = now - animRook.startTime;
+                const t = Math.min(elapsed/180, 1);
+                const scale = 0.6 + 0.4 * t;
+                ctx.save(); ctx.translate(x,y); ctx.scale(scale,scale);
+                drawPiece(ctx, board[animRook.idx], 0,0, sq*0.75);
+                ctx.restore();
+            } else if(animRook && rookAnimDone) animRook = null;
+
+            if(animPiece || animRook) {
+                if(!rafId) rafId = requestAnimationFrame(()=>{ rafId=null; render(); });
+            }
+        });
+    }
+
+    function drawPiece(ctx, piece, cx, cy, size) {
+        const ch = FA_CHESS[piece.type];
+        if (!ch) return;
+        ctx.save();
+        ctx.font = `900 ${size}px "Font Awesome 6 Free"`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        const shadowOffset = size * 0.06;
+        if (piece.color === 'white') {
+            ctx.fillStyle = '#b8956e';
+            ctx.fillText(ch, cx + shadowOffset, cy + shadowOffset);
+            ctx.fillStyle = '#faf3e0';
+            ctx.fillText(ch, cx, cy);
+        } else {
+            ctx.fillStyle = '#8a724b';
+            ctx.fillText(ch, cx + shadowOffset, cy + shadowOffset);
+            ctx.fillStyle = '#1a1008';
+            ctx.fillText(ch, cx, cy);
+        }
+        ctx.restore();
+    }
+
+    function getClickIndex(e) {
+        const rect = canvas.getBoundingClientRect();
+        const layout = getCanvasLayout();
+        const sx = layout.w / rect.width, sy = layout.h / rect.height;
+        const mx = (e.clientX - rect.left) * sx, my = (e.clientY - rect.top) * sy;
+        const col = Math.floor((mx - layout.ox) / layout.sq), row = Math.floor((my - layout.oy) / layout.sq);
+        if(row<0||row>7||col<0||col>7) return -1;
+        return idx(row,col);
+    }
+
+    canvas.addEventListener('click', e => {
+        if(gameOver || promoPending || engineThinking || turn !== 'white') return;
+        ensureAudio();
+        const i = getClickIndex(e);
+        if(i<0) return;
+        if(selIdx>=0) {
+            const move = legalMoves.find(m=>m.toIdx===i);
+            if(move) {
+                if(move.isPromo) { showPromo(selIdx,i,board[selIdx].color); selIdx=-1; legalMoves=[]; render(); return; }
+                executeMove(selIdx, move, null);
+                selIdx=-1; legalMoves=[]; updateUI(); return;
+            }
+            if(board[i] && board[i].color===turn) { selIdx=i; legalMoves=getLegalMoves(i); render(); return; }
+            selIdx=-1; legalMoves=[]; render(); return;
+        }
+        if(board[i] && board[i].color===turn) { selIdx=i; legalMoves=getLegalMoves(i); render(); }
+    });
+
+    canvas.addEventListener('touchstart', e => {
+        e.preventDefault();
+        if(gameOver || promoPending || engineThinking || turn !== 'white') return;
+        ensureAudio();
+        const i = getClickIndex(e.touches[0]);
+        if(i<0) return;
+        if(selIdx>=0) {
+            const move = legalMoves.find(m=>m.toIdx===i);
+            if(move) {
+                if(move.isPromo) { showPromo(selIdx,i,board[selIdx].color); selIdx=-1; legalMoves=[]; render(); return; }
+                executeMove(selIdx, move, null);
+                selIdx=-1; legalMoves=[]; updateUI(); return;
+            }
+            if(board[i] && board[i].color===turn) { selIdx=i; legalMoves=getLegalMoves(i); render(); return; }
+            selIdx=-1; legalMoves=[]; render(); return;
+        }
+        if(board[i] && board[i].color===turn) { selIdx=i; legalMoves=getLegalMoves(i); render(); }
+    }, {passive:false});
+
+    document.addEventListener('keydown', e => {
+        if((e.key==='r'||e.key==='R') && !e.ctrlKey && !e.metaKey && document.activeElement===document.body) resetGame();
+        if(e.key==='Escape' && !promoPending) { selIdx=-1; legalMoves=[]; clearNotifs(); render(); }
+    });
+    resetBtn.addEventListener('click', resetGame);
+
+    let resizeTimeout;
+    window.addEventListener('resize', () => {
+        clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(()=>{ setupCanvas(); render(); }, 100);
+    });
+
+    function resetGame() {
+        if (engineThinking) {
+            sendToEngine('stop');
+            engineThinking = false;
+            clearEngineTimeout();
+        }
+
+        board = new Array(64).fill(null);
+        board[0]={type:'rook',color:'black'}; board[1]={type:'knight',color:'black'};
+        board[2]={type:'bishop',color:'black'}; board[3]={type:'queen',color:'black'};
+        board[4]={type:'king',color:'black'}; board[5]={type:'bishop',color:'black'};
+        board[6]={type:'knight',color:'black'}; board[7]={type:'rook',color:'black'};
+        for(let c=0;c<8;c++) board[8+c] = {type:'pawn',color:'black'};
+        for(let c=0;c<8;c++) board[48+c] = {type:'pawn',color:'white'};
+        board[56]={type:'rook',color:'white'}; board[57]={type:'knight',color:'white'};
+        board[58]={type:'bishop',color:'white'}; board[59]={type:'queen',color:'white'};
+        board[60]={type:'king',color:'white'}; board[61]={type:'bishop',color:'white'};
+        board[62]={type:'knight',color:'white'}; board[63]={type:'rook',color:'white'};
+
+        turn = 'white';
+        castling = { wK:true, wQ:true, bK:true, bQ:true };
+        epTarget = -1; halfMoves = 0; fullMove = 1;
+        selIdx = -1; legalMoves = []; lastFrom = -1; lastTo = -1;
+        gameOver = false; gameResult = null; promoPending = null;
+        wkIdx = 60; bkIdx = 4; posHistory = new Map();
+        animPiece = null; animRook = null;
+        moveHistory = [];
+        engineThinking = false;
+        pendingEngineMove = false;
+        clearEngineTimeout();
+
+        if(rafId) { cancelAnimationFrame(rafId); rafId = null; }
+        updatePosHistory();
+        clearNotifs();
+        promoOverlay.style.display = 'none';
+
+        if (engineWorker && engineReady) {
+            sendToEngine('ucinewgame');
+        }
+        updateEngineStatus();
+        setupCanvas(); render(); updateUI();
+    }
+
+    // 初始化引擎
+    initEngine();
+
+    if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(() => {
+            setupCanvas();
+            render();
+        });
+    } else {
+        window.addEventListener('load', () => {
+            setupCanvas();
+            render();
+        });
+    }
+
+    // 初始重置
+    resetGame();
+})();
+</script>
+</body>
+</html>
