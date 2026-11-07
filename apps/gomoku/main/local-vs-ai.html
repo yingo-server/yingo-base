@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.5, user-scalable=yes">
+    <title>人机对战 · 五子棋</title>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link rel="stylesheet" href="../css/base/reset.css">
+    <link rel="stylesheet" href="../css/base/typography.css">
+    <link rel="stylesheet" href="../css/theme/material-colors.css">
+    <link rel="stylesheet" href="../css/theme/animations.css">
+    <link rel="stylesheet" href="../css/layout/container.css">
+    <link rel="stylesheet" href="../css/components/buttons.css">
+    <link rel="stylesheet" href="../css/components/board.css">
+    <link rel="stylesheet" href="../css/components/toast.css">
+    <link rel="stylesheet" href="../css/pages/local-2p.css">
+</head>
+<body class="md2-theme local-2p-page">
+    <div class="container game-page">
+        <header class="game-header">
+            <a href="../index.html" class="md2-icon-button">
+                <span class="material-icons">arrow_back</span>
+            </a>
+            <h2 class="md2-title">人机对战</h2>
+            <div style="display: flex; gap: 8px;">
+                <button class="md2-button" id="resetBtn">重新开始</button>
+                <button class="md2-button" id="downloadLogBtn" style="background-color: #2196f3;">📥 下载日志</button>
+            </div>
+        </header>
+        <main class="game-main">
+            <div class="board-wrapper">
+                <canvas id="board" width="600" height="600" class="board-canvas"></canvas>
+            </div>
+        </main>
+        <footer class="game-footer">
+            <span class="md2-caption">你执黑先手 · AI防守型</span>
+        </footer>
+    </div>
+
+    <!-- Toast 容器 -->
+    <div id="toast-container" class="md2-toast-container"></div>
+
+    <!-- 日志捕获脚本（必须最先执行） -->
+    <script>
+        (function() {
+            const originalLog = console.log;
+            window._aiLogs = [];
+            const MAX_LOGS = 2000;
+            console.log = function(...args) {
+                originalLog.apply(console, args);
+                const message = args.map(arg => {
+                    if (typeof arg === 'object') {
+                        try {
+                            return JSON.stringify(arg, null, 2);
+                        } catch (e) {
+                            return String(arg);
+                        }
+                    }
+                    return String(arg);
+                }).join(' ');
+                const timestamp = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+                window._aiLogs.push(`[${timestamp}] ${message}`);
+                if (window._aiLogs.length > MAX_LOGS) window._aiLogs.shift();
+            };
+            window.addEventListener('error', (e) => console.log(`[错误] ${e.message}`));
+        })();
+    </script>
+
+    <script type="module">
+        import AIGame from '../js/ai/ai-game.js';
+        const canvas = document.getElementById('board');
+        const resetBtn = document.getElementById('resetBtn');
+        const downloadLogBtn = document.getElementById('downloadLogBtn');
+        const game = new AIGame(canvas, resetBtn, 1); // 不再传入 turnIndicator
+
+        downloadLogBtn.addEventListener('click', () => {
+            const logs = window._aiLogs || [];
+            if (logs.length === 0) {
+                alert('暂无日志可下载');
+                return;
+            }
+            const content = logs.join('\n');
+            const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `gomoku_ai_log_${new Date().toISOString().slice(0,19).replace(/:/g, '-')}.log`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        });
+    </script>
+</body>
+</html>
