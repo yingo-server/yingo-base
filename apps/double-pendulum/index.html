@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>双摆 · 混沌模拟</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { margin: 0; overflow: hidden; background: #000; height: 100vh; display: flex; justify-content: center; align-items: center; }
+        canvas { display: block; width: 100%; height: 100%; }
+    </style>
+</head>
+<body>
+    <canvas id="pendulumCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('pendulumCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+        
+        const G = 9.8;
+        const m1 = 1.0, m2 = 1.0;
+        const l1 = 1.0, l2 = 1.0;
+        
+        let th1 = Math.PI; // 初始角度设为π，使摆球向左
+        let th2 = Math.PI + 0.2;
+        let om1 = 0.0;
+        let om2 = 0.0;
+        
+        let trail1 = [];
+        let trail2 = [];
+        let showTrail = true;
+        
+        const h = 0.02;
+        let time = 0;
+        
+        function rungeKutta4(h, y0) {
+            const s0 = df(y0);
+            const s1 = df([
+                y0[0] + h * s0[0] / 2,
+                y0[1] + h * s0[1] / 2,
+                y0[2] + h * s0[2] / 2,
+                y0[3] + h * s0[3] / 2
+            ]);
+            const s2 = df([
+                y0[0] + h * s1[0] / 2,
+                y0[1] + h * s1[1] / 2,
+                y0[2] + h * s1[2] / 2,
+                y0[3] + h * s1[3] / 2
+            ]);
+            const s3 = df([
+                y0[0] + h * s2[0],
+                y0[1] + h * s2[1],
+                y0[2] + h * s2[2],
+                y0[3] + h * s2[3]
+            ]);
+            
+            return [
+                y0[0] + h * (s0[0] + 2*s1[0] + 2*s2[0] + s3[0]) / 6,
+                y0[1] + h * (s0[1] + 2*s1[1] + 2*s2[1] + s3[1]) / 6,
+                y0[2] + h * (s0[2] + 2*s1[2] + 2*s2[2] + s3[2]) / 6,
+                y0[3] + h * (s0[3] + 2*s1[3] + 2*s2[3] + s3[3]) / 6
+            ];
+        }
+        
+        function df(variables) {
+            const [th1, th2, om1, om2] = variables;
+            
+            const A = [
+                [l1 * (m1 + m2), m2 * l2 * Math.cos(th1 - th2)],
+                [l2 * Math.cos(th1 - th2), l1]
+            ];
+            
+            const b = [
+                (m1 + m2) * G * Math.cos(th1) - m2 * l2 * Math.sin(th1 - th2) * om2**2,
+                l1 * Math.sin(th1 - th2) * om1**2 + G * Math.cos(th2)
+            ];
+            
+            const det = A[0][0] * A[1][1] - A[0][1] * A[1][0];
+            const dom1 = (b[0] * A[1][1] - b[1] * A[0][1]) / det;
+            const dom2 = (A[0][0] * b[1] - A[1][0] * b[0]) / det;
+            
+            return [om1, om2, dom1, dom2];
+        }
+        
+        function update() {
+            const newState = rungeKutta4(h, [th1, th2, om1, om2]);
+            th1 = newState[0];
+            th2 = newState[1];
+            om1 = newState[2];
+            om2 = newState[3];
+            time += h;
+        }
+        
+        function getPositions() {
+            // 重力向左，所以调整位置计算
+            const x1 = l1 * Math.cos(th1);
+            const y1 = l1 * Math.sin(th1);
+            const x2 = x1 + l2 * Math.cos(th2);
+            const y2 = y1 + l2 * Math.sin(th2);
+            
+            return { x1, y1, x2, y2 };
+        }
+        
+        function draw() {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            const { x1, y1, x2, y2 } = getPositions();
+            
+            const scale = 150;
+            const pivotX = canvas.width / 2;
+            const pivotY = canvas.height / 2;
+            
+            const canvasX1 = pivotX + x1 * scale;
+            const canvasY1 = pivotY + y1 * scale;
+            const canvasX2 = pivotX + x2 * scale;
+            const canvasY2 = pivotY + y2 * scale;
+            
+            if (showTrail) {
+                trail1.push({ x: canvasX1, y: canvasY1 });
+                trail2.push({ x: canvasX2, y: canvasY2 });
+                
+                if (trail1.length > 500) trail1.shift();
+                if (trail2.length > 500) trail2.shift();
+                
+                drawTrail(trail1, '#ff6b6b');
+                drawTrail(trail2, '#4ecdc4');
+            }
+            
+            ctx.beginPath();
+            ctx.moveTo(pivotX, pivotY);
+            ctx.lineTo(canvasX1, canvasY1);
+            ctx.lineTo(canvasX2, canvasY2);
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            ctx.beginPath();
+            ctx.arc(pivotX, pivotY, 5, 0, Math.PI * 2);
+            ctx.fillStyle = '#ffffff';
+            ctx.fill();
+            
+            ctx.beginPath();
+            ctx.arc(canvasX1, canvasY1, 10, 0, Math.PI * 2);
+            ctx.fillStyle = '#ff6b6b';
+            ctx.fill();
+            
+            ctx.beginPath();
+            ctx.arc(canvasX2, canvasY2, 8, 0, Math.PI * 2);
+            ctx.fillStyle = '#4ecdc4';
+            ctx.fill();
+            
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '16px Arial';
+            ctx.fillText(`时间: ${time.toFixed(1)}s`, 10, 20);
+        }
+        
+        function drawTrail(trail, color) {
+            if (trail.length < 2) return;
+            
+            ctx.beginPath();
+            ctx.moveTo(trail[0].x, trail[0].y);
+            
+            for (let i = 1; i < trail.length; i++) {
+                ctx.lineTo(trail[i].x, trail[i].y);
+            }
+            
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+        }
+        
+        function reset() {
+            th1 = Math.PI;
+            th2 = Math.PI + 0.2;
+            om1 = 0.0;
+            om2 = 0.0;
+            time = 0;
+            trail1 = [];
+            trail2 = [];
+        }
+        
+        function animate() {
+            update();
+            draw();
+            requestAnimationFrame(animate);
+        }
+        
+        canvas.addEventListener('click', reset);
+        
+        animate();
+    </script>
+</body>
+</html>

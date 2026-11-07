@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>双摆物理模拟</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            background: #000; 
+            height: 100vh; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            font-family: Arial, sans-serif;
+            color: white;
+        }
+        canvas { display: block; width: 100%; height: 100%; }
+        
+        /* 菜单按钮样式 */
+        .menu-toggle {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            border: 1px solid #555;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            font-size: 24px;
+            cursor: pointer;
+            z-index: 1001;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: all 0.3s;
+        }
+        .menu-toggle:hover {
+            background: rgba(30, 30, 30, 0.8);
+            transform: scale(1.1);
+        }
+        
+        /* 全屏菜单样式 */
+        .controls {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            padding: 20px;
+            z-index: 1000;
+            overflow-y: auto;
+            transition: transform 0.3s ease;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .controls.hidden {
+            transform: translateY(-100%);
+        }
+        
+        .controls-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #444;
+            padding-bottom: 15px;
+        }
+        
+        .controls-title {
+            font-size: 24px;
+            color: #4ecdc4;
+        }
+        
+        .controls-content {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            flex: 1;
+        }
+        
+        .param-group {
+            background: rgba(30, 30, 30, 0.6);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #444;
+        }
+        
+        .param-group h4 {
+            margin-bottom: 10px;
+            color: #ff6b6b;
+            border-bottom: 1px solid #444;
+            padding-bottom: 5px;
+        }
+        
+        .param-item {
+            margin-bottom: 12px;
+        }
+        
+        .param-item label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 14px;
+        }
+        
+        .param-item input {
+            width: 100%;
+        }
+        
+        .value-display {
+            font-size: 12px;
+            color: #4ecdc4;
+            margin-top: 3px;
+        }
+        
+        .buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+            justify-content: center;
+        }
+        
+        button {
+            background: #333;
+            color: white;
+            border: 1px solid #555;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        button:hover {
+            background: #444;
+            transform: translateY(-2px);
+        }
+        
+        .close-btn {
+            background: #ff6b6b;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 8px 15px;
+            cursor: pointer;
+        }
+        
+        .close-btn:hover {
+            background: #ff5252;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="pendulumCanvas"></canvas>
+    
+    <!-- 菜单切换按钮 -->
+    <button class="menu-toggle" id="menuToggle">☰</button>
+    
+    <!-- 全屏菜单 -->
+    <div class="controls" id="controls">
+        <div class="controls-header">
+            <h2 class="controls-title">双摆物理模拟参数控制</h2>
+            <button class="close-btn" id="closeMenu">关闭菜单</button>
+        </div>
+        
+        <div class="controls-content">
+            <!-- 物理参数 -->
+            <div class="param-group">
+                <h4>物理参数</h4>
+                
+                <div class="param-item">
+                    <label for="gravity">重力加速度 (G):</label>
+                    <input type="range" id="gravity" min="1" max="20" step="0.1" value="9.8">
+                    <div class="value-display" id="gravity-value">9.8 m/s²</div>
+                </div>
+                
+                <div class="param-item">
+                    <label for="mass1">第一个摆球质量 (m1):</label>
+                    <input type="range" id="mass1" min="0.1" max="5" step="0.1" value="1.0">
+                    <div class="value-display" id="mass1-value">1.0 kg</div>
+                </div>
+                
+                <div class="param-item">
+                    <label for="mass2">第二个摆球质量 (m2):</label>
+                    <input type="range" id="mass2" min="0.1" max="5" step="0.1" value="1.0">
+                    <div class="value-display" id="mass2-value">1.0 kg</div>
+                </div>
+                
+                <div class="param-item">
+                    <label for="length1">第一个摆长 (l1):</label>
+                    <input type="range" id="length1" min="0.5" max="3" step="0.1" value="1.0">
+                    <div class="value-display" id="length1-value">1.0 m</div>
+                </div>
+                
+                <div class="param-item">
+                    <label for="length2">第二个摆长 (l2):</label>
+                    <input type="range" id="length2" min="0.5" max="3" step="0.1" value="1.0">
+                    <div class="value-display" id="length2-value">1.0 m</div>
+                </div>
+            </div>
+            
+            <!-- 初始状态 -->
+            <div class="param-group">
+                <h4>初始状态</h4>
+                
+                <div class="param-item">
+                    <label for="angle1">第一个摆初始角度 (θ1):</label>
+                    <input type="range" id="angle1" min="0" max="6.28" step="0.01" value="3.14">
+                    <div class="value-display" id="angle1-value">3.14 rad (180°)</div>
+                </div>
+                
+                <div class="param-item">
+                    <label for="angle2">第二个摆初始角度 (θ2):</label>
+                    <input type="range" id="angle2" min="0" max="6.28" step="0.01" value="3.34">
+                    <div class="value-display" id="angle2-value">3.34 rad (191°)</div>
+                </div>
+                
+                <div class="param-item">
+                    <label for="velocity1">第一个摆初始角速度 (ω1):</label>
+                    <input type="range" id="velocity1" min="-5" max="5" step="0.1" value="0.0">
+                    <div class="value-display" id="velocity1-value">0.0 rad/s</div>
+                </div>
+                
+                <div class="param-item">
+                    <label for="velocity2">第二个摆初始角速度 (ω2):</label>
+                    <input type="range" id="velocity2" min="-5" max="5" step="0.1" value="0.0">
+                    <div class="value-display" id="velocity2-value">0.0 rad/s</div>
+                </div>
+            </div>
+            
+            <!-- 模拟参数 -->
+            <div class="param-group">
+                <h4>模拟参数</h4>
+                
+                <div class="param-item">
+                    <label for="timestep">时间步长 (h):</label>
+                    <input type="range" id="timestep" min="0.001" max="0.05" step="0.001" value="0.02">
+                    <div class="value-display" id="timestep-value">0.02 s</div>
+                </div>
+                
+                <div class="param-item">
+                    <label for="trailLength">轨迹长度:</label>
+                    <input type="range" id="trailLength" min="100" max="2000" step="50" value="500">
+                    <div class="value-display" id="trailLength-value">500 点</div>
+                </div>
+                
+                <div class="param-item">
+                    <label for="scale">缩放比例:</label>
+                    <input type="range" id="scale" min="50" max="300" step="10" value="150">
+                    <div class="value-display" id="scale-value">150</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="buttons">
+            <button id="resetBtn">重置模拟</button>
+            <button id="toggleTrailBtn">切换轨迹</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('pendulumCanvas');
+        const ctx = canvas.getContext('2d');
+        const menuToggle = document.getElementById('menuToggle');
+        const controls = document.getElementById('controls');
+        const closeMenu = document.getElementById('closeMenu');
+        
+        // ========== 可调整参数区域 ==========
+        
+        // 物理参数 - 可以通过滑块调整
+        let G = 9.8;           // 重力加速度 (m/s²) - 范围: 1-20
+        let m1 = 1.0;          // 第一个摆球质量 (kg) - 范围: 0.1-5
+        let m2 = 1.0;          // 第二个摆球质量 (kg) - 范围: 0.1-5
+        let l1 = 1.0;          // 第一个摆长 (m) - 范围: 0.5-3
+        let l2 = 1.0;          // 第二个摆长 (m) - 范围: 0.5-3
+        
+        // 初始状态 - 可以通过滑块调整
+        let th1 = Math.PI;     // 第一个摆初始角度 (弧度) - 范围: 0-6.28 (0-360°)
+        let th2 = Math.PI + 0.2; // 第二个摆初始角度 (弧度) - 范围: 0-6.28 (0-360°)
+        let om1 = 0.0;         // 第一个摆初始角速度 (rad/s) - 范围: -5到5
+        let om2 = 0.0;         // 第二个摆初始角速度 (rad/s) - 范围: -5到5
+        
+        // 模拟参数 - 可以通过滑块调整
+        let h = 0.02;          // 时间步长 (s) - 范围: 0.001-0.05 (值越小越精确但计算量越大)
+        let maxTrailLength = 500; // 轨迹长度 (点数) - 范围: 100-2000
+        let scale = 150;       // 缩放比例 - 范围: 50-300
+        
+        // 其他参数
+        let trail1 = [];
+        let trail2 = [];
+        let showTrail = true;
+        let time = 0;
+        
+        // ========== 菜单控制 ==========
+        menuToggle.addEventListener('click', () => {
+            controls.classList.toggle('hidden');
+        });
+        
+        closeMenu.addEventListener('click', () => {
+            controls.classList.add('hidden');
+        });
+        
+        // ========== 初始化Canvas ==========
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+        
+        // ========== 物理计算函数 ==========
+        function rungeKutta4(h, y0) {
+            const s0 = df(y0);
+            const s1 = df([
+                y0[0] + h * s0[0] / 2,
+                y0[1] + h * s0[1] / 2,
+                y0[2] + h * s0[2] / 2,
+                y0[3] + h * s0[3] / 2
+            ]);
+            const s2 = df([
+                y0[0] + h * s1[0] / 2,
+                y0[1] + h * s1[1] / 2,
+                y0[2] + h * s1[2] / 2,
+                y0[3] + h * s1[3] / 2
+            ]);
+            const s3 = df([
+                y0[0] + h * s2[0],
+                y0[1] + h * s2[1],
+                y0[2] + h * s2[2],
+                y0[3] + h * s2[3]
+            ]);
+            
+            return [
+                y0[0] + h * (s0[0] + 2*s1[0] + 2*s2[0] + s3[0]) / 6,
+                y0[1] + h * (s0[1] + 2*s1[1] + 2*s2[1] + s3[1]) / 6,
+                y0[2] + h * (s0[2] + 2*s1[2] + 2*s2[2] + s3[2]) / 6,
+                y0[3] + h * (s0[3] + 2*s1[3] + 2*s2[3] + s3[3]) / 6
+            ];
+        }
+        
+        function df(variables) {
+            const [th1, th2, om1, om2] = variables;
+            
+            const A = [
+                [l1 * (m1 + m2), m2 * l2 * Math.cos(th1 - th2)],
+                [l2 * Math.cos(th1 - th2), l1]
+            ];
+            
+            const b = [
+                (m1 + m2) * G * Math.cos(th1) - m2 * l2 * Math.sin(th1 - th2) * om2**2,
+                l1 * Math.sin(th1 - th2) * om1**2 + G * Math.cos(th2)
+            ];
+            
+            const det = A[0][0] * A[1][1] - A[0][1] * A[1][0];
+            const dom1 = (b[0] * A[1][1] - b[1] * A[0][1]) / det;
+            const dom2 = (A[0][0] * b[1] - A[1][0] * b[0]) / det;
+            
+            return [om1, om2, dom1, dom2];
+        }
+        
+        function update() {
+            const newState = rungeKutta4(h, [th1, th2, om1, om2]);
+            th1 = newState[0];
+            th2 = newState[1];
+            om1 = newState[2];
+            om2 = newState[3];
+            time += h;
+        }
+        
+        function getPositions() {
+            // 重力向左，所以调整位置计算
+            const x1 = l1 * Math.cos(th1);
+            const y1 = l1 * Math.sin(th1);
+            const x2 = x1 + l2 * Math.cos(th2);
+            const y2 = y1 + l2 * Math.sin(th2);
+            
+            return { x1, y1, x2, y2 };
+        }
+        
+        // ========== 绘制函数 ==========
+        function draw() {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            const { x1, y1, x2, y2 } = getPositions();
+            
+            const pivotX = canvas.width / 2;
+            const pivotY = canvas.height / 2;
+            
+            const canvasX1 = pivotX + x1 * scale;
+            const canvasY1 = pivotY + y1 * scale;
+            const canvasX2 = pivotX + x2 * scale;
+            const canvasY2 = pivotY + y2 * scale;
+            
+            if (showTrail) {
+                trail1.push({ x: canvasX1, y: canvasY1 });
+                trail2.push({ x: canvasX2, y: canvasY2 });
+                
+                if (trail1.length > maxTrailLength) trail1.shift();
+                if (trail2.length > maxTrailLength) trail2.shift();
+                
+                drawTrail(trail1, '#ff6b6b');
+                drawTrail(trail2, '#4ecdc4');
+            }
+            
+            ctx.beginPath();
+            ctx.moveTo(pivotX, pivotY);
+            ctx.lineTo(canvasX1, canvasY1);
+            ctx.lineTo(canvasX2, canvasY2);
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            ctx.beginPath();
+            ctx.arc(pivotX, pivotY, 5, 0, Math.PI * 2);
+            ctx.fillStyle = '#ffffff';
+            ctx.fill();
+            
+            ctx.beginPath();
+            ctx.arc(canvasX1, canvasY1, 10, 0, Math.PI * 2);
+            ctx.fillStyle = '#ff6b6b';
+            ctx.fill();
+            
+            ctx.beginPath();
+            ctx.arc(canvasX2, canvasY2, 8, 0, Math.PI * 2);
+            ctx.fillStyle = '#4ecdc4';
+            ctx.fill();
+            
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '16px Arial';
+            ctx.fillText(`时间: ${time.toFixed(1)}s`, 10, 20);
+        }
+        
+        function drawTrail(trail, color) {
+            if (trail.length < 2) return;
+            
+            ctx.beginPath();
+            ctx.moveTo(trail[0].x, trail[0].y);
+            
+            for (let i = 1; i < trail.length; i++) {
+                ctx.lineTo(trail[i].x, trail[i].y);
+            }
+            
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+        }
+        
+        // ========== 重置函数 ==========
+        function reset() {
+            th1 = parseFloat(document.getElementById('angle1').value);
+            th2 = parseFloat(document.getElementById('angle2').value);
+            om1 = parseFloat(document.getElementById('velocity1').value);
+            om2 = parseFloat(document.getElementById('velocity2').value);
+            time = 0;
+            trail1 = [];
+            trail2 = [];
+        }
+        
+        // ========== 动画循环 ==========
+        function animate() {
+            update();
+            draw();
+            requestAnimationFrame(animate);
+        }
+        
+        // ========== 事件监听 ==========
+        document.getElementById('resetBtn').addEventListener('click', reset);
+        document.getElementById('toggleTrailBtn').addEventListener('click', () => {
+            showTrail = !showTrail;
+            if (!showTrail) {
+                trail1 = [];
+                trail2 = [];
+            }
+        });
+        
+        // 绑定滑块事件
+        document.getElementById('gravity').addEventListener('input', function() {
+            G = parseFloat(this.value);
+            document.getElementById('gravity-value').textContent = G.toFixed(1) + ' m/s²';
+        });
+        
+        document.getElementById('mass1').addEventListener('input', function() {
+            m1 = parseFloat(this.value);
+            document.getElementById('mass1-value').textContent = m1.toFixed(1) + ' kg';
+        });
+        
+        document.getElementById('mass2').addEventListener('input', function() {
+            m2 = parseFloat(this.value);
+            document.getElementById('mass2-value').textContent = m2.toFixed(1) + ' kg';
+        });
+        
+        document.getElementById('length1').addEventListener('input', function() {
+            l1 = parseFloat(this.value);
+            document.getElementById('length1-value').textContent = l1.toFixed(1) + ' m';
+        });
+        
+        document.getElementById('length2').addEventListener('input', function() {
+            l2 = parseFloat(this.value);
+            document.getElementById('length2-value').textContent = l2.toFixed(1) + ' m';
+        });
+        
+        document.getElementById('angle1').addEventListener('input', function() {
+            document.getElementById('angle1-value').textContent = 
+                parseFloat(this.value).toFixed(2) + ' rad (' + 
+                Math.round(parseFloat(this.value) * 180 / Math.PI) + '°)';
+        });
+        
+        document.getElementById('angle2').addEventListener('input', function() {
+            document.getElementById('angle2-value').textContent = 
+                parseFloat(this.value).toFixed(2) + ' rad (' + 
+                Math.round(parseFloat(this.value) * 180 / Math.PI) + '°)';
+        });
+        
+        document.getElementById('velocity1').addEventListener('input', function() {
+            om1 = parseFloat(this.value);
+            document.getElementById('velocity1-value').textContent = om1.toFixed(1) + ' rad/s';
+        });
+        
+        document.getElementById('velocity2').addEventListener('input', function() {
+            om2 = parseFloat(this.value);
+            document.getElementById('velocity2-value').textContent = om2.toFixed(1) + ' rad/s';
+        });
+        
+        document.getElementById('timestep').addEventListener('input', function() {
+            h = parseFloat(this.value);
+            document.getElementById('timestep-value').textContent = h.toFixed(3) + ' s';
+        });
+        
+        document.getElementById('trailLength').addEventListener('input', function() {
+            maxTrailLength = parseInt(this.value);
+            document.getElementById('trailLength-value').textContent = maxTrailLength + ' 点';
+        });
+        
+        document.getElementById('scale').addEventListener('input', function() {
+            scale = parseInt(this.value);
+            document.getElementById('scale-value').textContent = scale;
+        });
+        
+        // 启动动画
+        animate();
+    </script>
+</body>
+</html>

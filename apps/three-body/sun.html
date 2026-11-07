@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>恒星</title>
+<style>
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000; }
+  canvas { display: block; width: 100vw; height: 100vh; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ============================================================
+     功能开关
+       扁率：改动核心求交路径，如出问题设为 false
+       磁场连接：日珥外包淡光晕，成本高但视觉加分
+       P 模式：60 秒周期径向脉动，像素级偏移
+       米粒寿命演化：在 warp 输出上加时间形变
+     ============================================================ */
+  var ENABLE_PMODE       = true;
+  var ENABLE_LIFE_EVOLVE = true;
+  var ENABLE_FLATTENING  = true;
+  var ENABLE_MAG_CONNECT = true;
+
+  var canvas = document.getElementById('c');
+  var gl = null;
+  try {
+    var opts = {
+      alpha: false, antialias: false, depth: false, stencil: false,
+      premultipliedAlpha: false, preserveDrawingBuffer: false,
+      powerPreference: 'high-performance'
+    };
+    gl = canvas.getContext('webgl', opts) || canvas.getContext('experimental-webgl', opts);
+  } catch (e) { gl = null; }
+
+  if (!gl) {
+    document.body.style.color = '#888';
+    document.body.style.fontFamily = 'monospace';
+    document.body.style.padding = '2em';
+    document.body.textContent = '需要支持 WebGL 的浏览器';
+    return;
+  }
+
+  var VERT_SRC = [
+    'attribute vec2 aPos;',
+    'void main(){ gl_Position = vec4(aPos, 0.0, 1.0); }'
+  ].join('\n');
+
+  var FRAG_SRC = [
+    '#ifdef GL_FRAGMENT_PRECISION_HIGH',
+    'precision highp float;',
+    '#else',
+    'precision mediump float;',
+    '#endif',
+
+    'uniform vec2  uRes;',
+    'uniform float uTime;',
+    'uniform vec3  uCamPos;',
+    'uniform float uR;',          /* 脉动半径，默认 1.0，由 JS 驱动 */
+
+    'uniform vec3  uFlareDir[3];',
+    'uniform vec4  uFlareData[3];',
+    'uniform vec3  uPromA[2];',
+    'uniform vec3  uPromB[2];',
+    'uniform vec2  uPromData[2];',
+
+    'uniform vec3  uBaseColor;',
+    'uniform vec3  uChromoColor;',
+    'uniform vec3  uCoronaColor;',
+    'uniform float uLimb;',
+    'uniform float uGranContrast;',
+    'uniform float uBrightness;',
+
+    /* 功能开关：0.0 关闭，1.0 开启 */
+    'uniform float uLifeEvolve;',
+    'uniform float uFlattening;',
+    'uniform float uMagConnect;',
+
+    'const float ROUT = 4.6;',
+    'const float PI   = 3.14159265;',
+
+    'float hash13(vec3 p3){',
+    '  p3 = fract(p3 * 0.1031);',
+    '  p3 += dot(p3, p3.zyx + 31.32);',
+    '  return fract((p3.x + p3.y) * p3.z);',
+    '}',
+
+    'vec3 hash33(vec3 p3){',
+    '  p3 = fract(p3 * vec3(0.1031, 0.1030, 0.0973));',
+    '  p3 += dot(p3, p3.yxz + 33.33);',
+    '  return fract((p3.xxy + p3.yxx) * p3.zyx);',
+    '}',
+
+    'float vnoise(vec3 x){',
+    '  vec3 i = floor(x);',
+    '  vec3 f = fract(x);',
+    '  f = f * f * (3.0 - 2.0 * f);',
+    '  float n000 = hash13(i + vec3(0.0, 0.0, 0.0));',
+    '  float n100 = hash13(i + vec3(1.0, 0.0, 0.0));',
+    '  float n010 = hash13(i + vec3(0.0, 1.0, 0.0));',
+    '  float n110 = hash13(i + vec3(1.0, 1.0, 0.0));',
+    '  float n001 = hash13(i + vec3(0.0, 0.0, 1.0));',
+    '  float n101 = hash13(i + vec3(1.0, 0.0, 1.0));',
+    '  float n011 = hash13(i + vec3(0.0, 1.0, 1.0));',
+    '  float n111 = hash13(i + vec3(1.0, 1.0, 1.0));',
+    '  float nx00 = mix(n000, n100, f.x);',
+    '  float nx10 = mix(n010, n110, f.x);',
+    '  float nx01 = mix(n001, n101, f.x);',
+    '  float nx11 = mix(n011, n111, f.x);',
+    '  float nxy0 = mix(nx00, nx10, f.y);',
+    '  float nxy1 = mix(nx01, nx11, f.y);',
+    '  return mix(nxy0, nxy1, f.z);',
+    '}',
+
+    'float fbm2(vec3 p){',
+    '  float s = 0.0;',
+    '  float a = 0.5;',
+    '  s += a * vnoise(p); p = p * 2.03 + vec3(13.7, 7.3, 5.1); a *= 0.5;',
+    '  s += a * vnoise(p);',
+    '  return s / 0.75;',
+    '}',
+
+    'float fbm3(vec3 p){',
+    '  float s = 0.0;',
+    '  float a = 0.5;',
+    '  s += a * vnoise(p); p = p * 2.03 + vec3(13.7, 7.3, 5.1); a *= 0.5;',
+    '  s += a * vnoise(p); p = p * 2.03 + vec3(13.7, 7.3, 5.1); a *= 0.5;',
+    '  s += a * vnoise(p);',
+    '  return s / 0.875;',
+    '}',
+
+    'vec2 worley(vec3 p){',
+    '  vec3 ip = floor(p);',
+    '  vec3 fp = fract(p);',
+    '  float f1 = 1e9;',
+    '  float f2 = 1e9;',
+    '  for (int x = -1; x <= 1; x++){',
+    '    for (int y = -1; y <= 1; y++){',
+    '      for (int z = -1; z <= 1; z++){',
+    '        vec3 g = vec3(float(x), float(y), float(z));',
+    '        vec3 o = hash33(ip + g);',
+    '        vec3 r = g + o - fp;',
+    '        float d = dot(r, r);',
+    '        if (d < f1){ f2 = f1; f1 = d; }',
+    '        else if (d < f2){ f2 = d; }',
+    '      }',
+    '    }',
+    '  }',
+    '  return vec2(sqrt(f1), sqrt(f2));',
+    '}',
+
+    'vec3 warp(vec3 p, float freq, float amt){',
+    '  return p + amt * (vec3(',
+    '    vnoise(p * freq + 11.7),',
+    '    vnoise(p * freq + 31.3),',
+    '    vnoise(p * freq + 57.9)',
+    '  ) - 0.5);',
+    '}',
+
+    'vec3 rotY(vec3 p, float a){',
+    '  float c = cos(a), s = sin(a);',
+    '  return vec3(c * p.x + s * p.z, p.y, -s * p.x + c * p.z);',
+    '}',
+
+    /* ============================================================
+       差旋自转
+       赤道 ω ≈ 0.020 rad/s，极区约慢 34%。所有结构统一使用。
+       ============================================================ */
+    'float diffOmega(vec3 dir){',
+    '  float lat = asin(clamp(dir.y, -1.0, 1.0));',
+    '  return 0.020 * (1.0 - 0.34 * sin(lat) * sin(lat));',
+    '}',
+
+    /* 太阳固定坐标系方向 → 世界坐标系方向 */
+    'vec3 sunToWorld(vec3 a){',
+    '  return rotY(a, uTime * diffOmega(a));',
+    '}',
+
+    /* 世界坐标系位置 → 太阳固定坐标系位置 */
+    'vec3 worldToSun(vec3 p){',
+    '  vec3 pn = p / max(uR, 0.001);',
+    '  return rotY(p, -uTime * diffOmega(pn));',
+    '}',
+
+    'float flareEnv(float a){',
+    '  float rise = smoothstep(0.0, 0.07, a);',
+    '  float fall = exp(-a * 2.6);',
+    '  float fade = 1.0 - smoothstep(0.82, 1.0, a);',
+    '  return rise * fall * fade;',
+    '}',
+
+    /* ============================================================
+       黑子场：本影 + 半影 + 谱斑环
+       ============================================================ */
+    'vec3 spotField(vec3 pr, float active){',
+    '  float t = uTime;',
+    '  vec3 drift = vec3(t * 0.0006, t * 0.0009, t * 0.0004);',
+
+    '  vec3 warped = warp(pr, 4.0, 0.10);',
+    '  float seed = worley(warped * 8.0 + drift).x;',
+
+    '  vec3 prN = normalize(pr);',
+    '  float latBias = 1.0 - smoothstep(0.62, 0.95, abs(prN.y));',
+    '  float inAct = smoothstep(0.55, 0.72, active) * latBias;',
+
+    '  float sizeVar = vnoise(pr * 4.5 + vec3(23.7) + drift * 0.3);',
+
+    '  float umbraR = 0.015 + 0.020 * sizeVar;',
+    '  float halfR  = 0.045 + 0.040 * sizeVar;',
+    '  float plageR = halfR * 2.4;',
+
+    '  float umbra = (1.0 - smoothstep(umbraR * 0.55, umbraR, seed)) * inAct;',
+
+    '  float penumbraRaw = (1.0 - smoothstep(umbraR, halfR, seed)) * inAct;',
+    '  float fib = vnoise(vec3(seed * 30.0, prN.x * 8.0, prN.y * 8.0 + t * 0.05));',
+    '  float penumbra = clamp(penumbraRaw * (0.45 + 0.85 * fib), 0.0, 1.0);',
+    '  penumbra = max(penumbra, umbra);',
+
+    /* 谱斑：半影之外的环形亮区，物理上与黑子同源 */
+    '  float plage = (smoothstep(halfR, halfR + 0.04, seed)',
+    '               - smoothstep(plageR - 0.04, plageR, seed)) * inAct;',
+    '  plage = max(plage, 0.0);',
+
+    '  return vec3(umbra, penumbra, plage);',
+    '}',
+
+    /* 日珥足点场：世界坐标系中的法线 → 切向方向与强度 */
+    'vec3 promFootField(vec3 n){',
+    '  float total = 0.0;',
+    '  vec2 dirAcc = vec2(0.0);',
+
+    '  for (int i = 0; i < 2; i++){',
+    '    float strength = uPromData[i].x;',
+    '    if (strength <= 0.005) continue;',
+    '    vec3 a = sunToWorld(normalize(uPromA[i]));',
+    '    vec3 b = sunToWorld(normalize(uPromB[i]));',
+
+    '    float da = acos(clamp(dot(n, a), -1.0, 1.0));',
+    '    float db = acos(clamp(dot(n, b), -1.0, 1.0));',
+    '    float ga = exp(-pow(da / 0.18, 2.0));',
+    '    float gb = exp(-pow(db / 0.18, 2.0));',
+    '    total += (ga + gb) * strength;',
+
+    '    vec3 ta = a - dot(a, n) * n;',
+    '    vec3 tb = b - dot(b, n) * n;',
+    '    float la = length(ta);',
+    '    float lb = length(tb);',
+    '    if (la > 1e-3) dirAcc += (ta / la).xy * ga;',
+    '    if (lb > 1e-3) dirAcc += (tb / lb).xy * gb;',
+    '  }',
+
+    '  float dl = length(dirAcc);',
+    '  if (dl > 1e-3) dirAcc /= dl;',
+    '  return vec3(total, dirAcc);',
+    '}',
+
+    /* ============================================================
+       表面层
+       ============================================================ */
+    'vec3 stellarSurface(vec3 p, vec3 n, vec3 v){',
+    '  float t = uTime;',
+
+    '  vec3 pr = worldToSun(p);',
+
+    '  vec3 drift = vec3(t * 0.004, t * 0.007, t * 0.003);',
+    '  float active = fbm2(pr * 1.8 + vec3(t * 0.0015, 0.0, 0.0));',
+
+    '  vec3 spot = spotField(pr, active);',
+    '  vec3 prom = promFootField(n);',
+    '  float umbra = spot.x;',
+    '  float penumbra = spot.y;',
+    '  float plage = spot.z;',
+    '  float promFoot = prom.x;',
+    '  vec2 promDir = prom.yz;',
+
+    /* 超米粒 */
+    '  vec3 sgW = warp(pr, 3.0, 0.35);',
+    '  float sgF1 = worley(sgW * 18.0 + drift * 0.20).x;',
+    '  float superGran = 1.0 - smoothstep(0.0, 0.85, sgF1);',
+
+    /* 中米粒：介于超米粒和米粒之间的一层 */
+    '  vec3 midW = warp(pr, 6.0, 0.25);',
+    '  float midF1 = worley(midW * 55.0 + drift * 0.5).x;',
+    '  float midGran = 1.0 - smoothstep(0.0, 0.75, midF1);',
+
+    /* 米粒：基础域 */
+    '  vec3 gW = warp(pr, 10.0, 0.16);',
+
+    /* 寿命演化：在 gW 上叠加时间相关的域形变，让细胞缓慢变形而非刚性平移 */
+    '  if (uLifeEvolve > 0.5){',
+    '    vec3 lifeOff = vec3(',
+    '      vnoise(gW * 3.0 + uTime * 0.06),',
+    '      vnoise(gW * 3.0 + uTime * 0.06 + 17.3),',
+    '      vnoise(gW * 3.0 + uTime * 0.06 + 43.7)',
+    '    ) - 0.5;',
+    '    gW += lifeOff * 0.0013;',
+    '  }',
+
+    '  vec2 gw = worley(gW * 150.0 + drift * 1.0);',
+    '  float f1 = gw.x;',
+    '  float f2 = gw.y;',
+
+    '  float core = 1.0 - smoothstep(0.0, 0.52, f1);',
+    '  float lane = smoothstep(0.02, 0.22, f2 - f1);',
+    '  float gran = mix(0.15, 1.0, core * lane);',
+
+    '  float subtle = fbm3(pr * 90.0 + drift * 2.0);',
+    '  gran *= 0.94 + 0.12 * subtle;',
+
+    /* 黑子对米粒的抑制 */
+    '  gran *= 1.0 - umbra * 0.92;',
+    '  gran *= 1.0 - (penumbra - umbra) * 0.30;',
+
+    /* 日珥足点的高频扰动 */
+    '  if (promFoot > 0.01){',
+    '    float footTurb = vnoise(pr * 22.0 + vec3(promDir * 4.0, t * 0.25));',
+    '    float footAmp = clamp(promFoot, 0.0, 1.0);',
+    '    gran = mix(gran, gran * (0.65 + 0.85 * footTurb), footAmp * 0.7);',
+    '  }',
+
+    '  float bright = 0.70 + uGranContrast * gran',
+    '               + 0.05 * (superGran - 0.5)',
+    '               + 0.04 * (midGran - 0.5)',
+    '               + 0.05 * (active - 0.5);',
+
+    /* 谱斑提亮 */
+    '  bright *= 1.0 + plage * 0.20;',
+
+    '  float mu = clamp(dot(n, v), 0.0, 1.0);',
+    '  float limb = 1.0 - uLimb * (1.0 - mu);',
+    '  bright *= limb;',
+
+    '  vec3 col = uBaseColor * bright * uBrightness;',
+
+    /* 黑子压暗 + 降色温 */
+    '  float darken = umbra * 0.88 + (penumbra - umbra) * 0.50;',
+    '  vec3 spotTint = mix(vec3(1.0), vec3(1.00, 0.82, 0.65), umbra * 0.75);',
+    '  col *= (1.0 - max(darken, 0.0)) * spotTint;',
+
+    /* 前方大气 */
+    '  float frontHaze = pow(1.0 - mu, 1.6);',
+    '  float hazeNoise = fbm3(pr * 40.0 + vec3(t * 0.06, t * 0.04, 0.0));',
+    '  col += uCoronaColor * frontHaze * (0.35 + 0.65 * hazeNoise) * 0.55;',
+
+    /* 色球层 */
+    '  float rim = pow(1.0 - mu, 4.0);',
+    '  float spic = fbm3(pr * 70.0 + vec3(t * 0.10, t * 0.065, 0.0));',
+    '  col += uChromoColor * rim * (0.25 + 0.75 * spic) * 0.45;',
+
+    /* 耀斑：足点用太阳固定坐标系，与 pr 一致 */
+    '  for (int i = 0; i < 3; i++){',
+    '    vec3 fd = normalize(uFlareDir[i]);',
+    '    float fa = clamp(uFlareData[i].x, 0.0, 1.0);',
+    '    float fi = uFlareData[i].y;',
+    '    if (fi <= 0.0) continue;',
+    '    float env = flareEnv(fa);',
+    '    if (env < 0.002) continue;',
+    '    float ang = acos(clamp(dot(pr, fd), -1.0, 1.0));',
+    '    float footR = 0.045 + 0.090 * fa;',
+    '    float foot = exp(-pow(ang / footR, 2.0)) * 2.4;',
+    '    float haloR = 0.13 + 0.22 * fa;',
+    '    float halo = exp(-pow(ang / haloR, 2.0)) * 0.60;',
+    '    float e = env * fi * (foot + halo);',
+    '    vec3 flareCol = mix(uBaseColor, vec3(1.0), 0.35);',
+    '    col += flareCol * e * (0.30 + 0.70 * mu);',
+    '  }',
+
+    '  return col;',
+    '}',
+
+    /* ============================================================
+       日冕
+       ============================================================ */
+    'vec3 coronaSample(vec3 p){',
+    '  float r = length(p);',
+    '  float rr = r / uR;',
+    '  float fall = pow(rr, -2.2) * exp(-(rr - 1.0) * 1.6);',
+    '  vec3 dir = p / r;',
+    '  float n = fbm3(dir * 4.0 + vec3(0.0, uTime * 0.008, uTime * 0.005));',
+    '  float fil = 0.40 + 0.60 * n;',
+    '  float mixT = clamp((rr - 1.0) / 1.5, 0.0, 1.0) * 0.6;',
+    '  vec3 tint = mix(uCoronaColor, uChromoColor, mixT);',
+    '  return tint * fall * fil;',
+    '}',
+
+    'vec3 flareCME(vec3 p){',
+    '  vec3 acc = vec3(0.0);',
+    '  for (int i = 0; i < 3; i++){',
+    '    float fi = uFlareData[i].y;',
+    '    if (fi <= 0.0) continue;',
+    '    float fa = clamp(uFlareData[i].x, 0.0, 1.0);',
+    '    float env = flareEnv(fa);',
+    '    if (env < 0.002) continue;',
+    /* 差旋自转：CME 中心跟随足点纬度旋转 */
+    '    vec3 fd = sunToWorld(normalize(uFlareDir[i]));',
+    '    vec3 center = fd * (uR + fa * 0.90);',
+    '    float shellR = 0.22 + fa * 0.75;',
+    '    float d = length(p - center);',
+    '    float shell = exp(-pow((d - shellR) / (0.15 + 0.28 * fa), 2.0));',
+    '    float turb = vnoise(p * 6.0 + vec3(uTime * 0.35, uTime * 0.22, 0.0));',
+    '    shell *= 0.30 + 1.30 * turb;',
+    '    acc += uCoronaColor * shell * env * fi * 0.50;',
+    '  }',
+    '  return acc;',
+    '}',
+
+    'vec3 renderCorona(vec3 ro, vec3 rd){',
+    '  float b = dot(ro, rd);',
+    '  float c = dot(ro, ro);',
+    '  float discO = b * b - (c - ROUT * ROUT);',
+    '  if (discO < 0.0) return vec3(0.0);',
+    '  float sq = sqrt(discO);',
+    '  float t0 = max(-b - sq, 0.0);',
+    '  float t1 = -b + sq;',
+    '  float discI = b * b - (c - uR * uR);',
+    '  if (discI > 0.0){',
+    '    float tIn = -b - sqrt(discI);',
+    '    if (tIn > 0.0) t1 = min(t1, tIn);',
+    '  }',
+    '  if (t1 <= t0) return vec3(0.0);',
+    '  const int STEPS = 20;',
+    '  float dt = (t1 - t0) / float(STEPS);',
+    '  float jitter = hash13(vec3(gl_FragCoord.xy, 0.0));',
+    '  vec3 sum = vec3(0.0);',
+    '  for (int i = 0; i < STEPS; i++){',
+    '    float tt = t0 + (float(i) + jitter) * dt;',
+    '    vec3 p = ro + rd * tt;',
+    '    sum += (coronaSample(p) + flareCME(p)) * dt;',
+    '  }',
+    '  return sum * 0.55;',
+    '}',
+
+    /* ============================================================
+       日珥：细管磁拱 + 可选的磁场连接光晕
+       ============================================================ */
+    'vec3 prominenceSample(vec3 p){',
+    '  vec3 acc = vec3(0.0);',
+    '  float r = length(p);',
+    '  float t = uTime;',
+
+    '  for (int i = 0; i < 2; i++){',
+    '    float strength = uPromData[i].x;',
+    '    if (strength <= 0.005) continue;',
+
+    /* 差旋自转 */
+    '    vec3 a = sunToWorld(normalize(uPromA[i]));',
+    '    vec3 b = sunToWorld(normalize(uPromB[i]));',
+
+    '    vec3 nrm = cross(a, b);',
+    '    float nl = length(nrm);',
+    '    if (nl < 1e-4) continue;',
+    '    nrm /= nl;',
+
+    '    vec3 dir = p / r;',
+    '    vec3 dirArc = dir - dot(dir, nrm) * nrm;',
+    '    float dl = length(dirArc);',
+    '    if (dl < 1e-4) continue;',
+    '    dirArc /= dl;',
+
+    '    float da = dot(dirArc, a);',
+    '    float db = dot(dirArc, b);',
+    '    if (da < 0.0 || db < 0.0) continue;',
+
+    '    float totalArc = acos(clamp(dot(a, b), -1.0, 1.0));',
+    '    if (totalArc < 1e-3) continue;',
+    '    float u = acos(clamp(da, -1.0, 1.0)) / totalArc;',
+
+    '    float h = 0.34 * sin(PI * u) * (0.75 + 0.5 * strength);',
+
+    '    float delta = acos(clamp(dot(dir, dirArc), -1.0, 1.0));',
+    '    float rDiff = r - (uR + h);',
+    '    float aDiff = r * delta;',
+    '    float dist = sqrt(rDiff * rDiff + aDiff * aDiff);',
+
+    /* 细管：宽度 0.014，长宽比约 1:24 */
+    '    float width = 0.014 + 0.006 * sin(PI * u);',
+
+    '    float turb = vnoise(p * 7.0 + vec3(t * 0.12, t * 0.08, 0.0));',
+    '    turb = 0.55 + 0.90 * turb;',
+    '    float heightFall = 0.35 + 0.65 * sin(PI * u);',
+
+    '    float glow = exp(-pow(dist / width, 2.0)) * turb * heightFall;',
+
+    /* 深红主弧 */
+    '    vec3 promCol = vec3(uChromoColor.r, uChromoColor.g * 0.6, uChromoColor.b * 0.4);',
+    '    acc += promCol * glow * strength * 2.6;',
+
+    /* 磁场连接：宽而淡的日冕色光晕，包在主弧外 */
+    '    if (uMagConnect > 0.5){',
+    '      float magWidth = 0.045;',
+    '      float magGlow = exp(-pow(dist / magWidth, 2.0)) * turb * heightFall * 0.22;',
+    '      acc += uCoronaColor * magGlow * strength * 0.5;',
+    '    }',
+    '  }',
+    '  return acc;',
+    '}',
+
+    'vec3 renderProminence(vec3 ro, vec3 rd){',
+    '  bool anyActive = false;',
+    '  for (int i = 0; i < 2; i++){',
+    '    if (uPromData[i].x > 0.005) { anyActive = true; break; }',
+    '  }',
+    '  if (!anyActive) return vec3(0.0);',
+
+    '  bool nearPlane = false;',
+    '  for (int i = 0; i < 2; i++){',
+    '    if (uPromData[i].x <= 0.005) continue;',
+    '    vec3 aR = sunToWorld(normalize(uPromA[i]));',
+    '    vec3 bR = sunToWorld(normalize(uPromB[i]));',
+    '    vec3 nrm = cross(aR, bR);',
+    '    float nl = length(nrm);',
+    '    if (nl < 1e-4) continue;',
+    '    nrm /= nl;',
+    '    if (abs(dot(rd, nrm)) < 0.55) { nearPlane = true; break; }',
+    '  }',
+    '  if (!nearPlane) return vec3(0.0);',
+
+    '  const float PROM_R = 1.7;',
+    '  float b = dot(ro, rd);',
+    '  float c = dot(ro, ro);',
+    '  float discO = b * b - (c - PROM_R * PROM_R);',
+    '  if (discO < 0.0) return vec3(0.0);',
+    '  float sq = sqrt(discO);',
+    '  float t0 = max(-b - sq, 0.0);',
+    '  float t1 = -b + sq;',
+    '  float discI = b * b - (c - uR * uR);',
+    '  if (discI > 0.0){',
+    '    float tIn = -b - sqrt(discI);',
+    '    if (tIn > 0.0) t1 = min(t1, tIn);',
+    '  }',
+    '  if (t1 <= t0) return vec3(0.0);',
+
+    '  const int PS = 18;',
+    '  float dt = (t1 - t0) / float(PS);',
+    '  float jitter = hash13(vec3(gl_FragCoord.xy, 7.3));',
+    '  vec3 sum = vec3(0.0);',
+    '  for (int i = 0; i < PS; i++){',
+    '    float tt = t0 + (float(i) + jitter) * dt;',
+    '    vec3 p = ro + rd * tt;',
+    '    sum += prominenceSample(p) * dt;',
+    '  }',
+    '  return sum * 0.5;',
+    '}',
+
+    'vec3 tonemap(vec3 x){',
+    '  x = max(x, vec3(0.0));',
+    '  float m = max(max(x.r, x.g), x.b);',
+    '  float mNew = m / (1.0 + max(0.0, m - 0.85) * 0.6);',
+    '  return x * (mNew / max(m, 1e-5));',
+    '}',
+
+    'void main(){',
+    '  vec2 uv = (gl_FragCoord.xy - 0.5 * uRes) / uRes.y;',
+    '  vec3 ro = uCamPos;',
+    '  vec3 fwd = normalize(-ro);',
+    '  vec3 rgt = normalize(cross(fwd, vec3(0.0, 1.0, 0.0)));',
+    '  vec3 upv = cross(rgt, fwd);',
+    '  vec3 rd = normalize(uv.x * rgt + uv.y * upv + 1.7 * fwd);',
+
+    /* 太阳扁率：沿 y 轴（自转轴）压缩。
+       invFlat = 1 / (1 - flat)。uFlattening = 0 时 invFlat = 1，
+       完全退化为球体求交。 */
+    '  float invFlat = 1.0 / max(1.0 - uFlattening, 0.5);',
+    '  vec3 roS = vec3(ro.x, ro.y * invFlat, ro.z);',
+    '  vec3 rdS = vec3(rd.x, rd.y * invFlat, rd.z);',
+
+    '  float aq = dot(rdS, rdS);',
+    '  float bq = dot(roS, rdS);',
+    '  float cq = dot(roS, roS) - uR * uR;',
+    '  float discS = bq * bq - aq * cq;',
+
+    '  vec3 col = vec3(0.0);',
+    '  bool hit = false;',
+
+    '  if (discS > 0.0){',
+    '    float tHit = (-bq - sqrt(discS)) / max(aq, 1e-6);',
+    '    if (tHit > 0.0){',
+    '      hit = true;',
+    '      vec3 p = ro + rd * tHit;',
+    /* 椭球法线：梯度 (x, y*invFlat², z) */
+    '      vec3 n = normalize(vec3(p.x, p.y * invFlat * invFlat, p.z));',
+    '      col = stellarSurface(p, n, -rd);',
+    '    }',
+    '  }',
+
+    '  if (!hit){',
+    '    col = renderCorona(ro, rd);',
+    '    col += renderProminence(ro, rd);',
+    '  }',
+
+    '  col = tonemap(col);',
+    '  col = pow(col, vec3(1.0 / 2.2));',
+    '  gl_FragColor = vec4(col, 1.0);',
+    '}'
+  ].join('\n');
+
+  function compile(type, src) {
+    var sh = gl.createShader(type);
+    if (!sh) return null;
+    gl.shaderSource(sh, src);
+    gl.compileShader(sh);
+    if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) {
+      console.error('[恒星] 着色器编译失败:', gl.getShaderInfoLog(sh));
+      gl.deleteShader(sh);
+      return null;
+    }
+    return sh;
+  }
+
+  var vs = compile(gl.VERTEX_SHADER, VERT_SRC);
+  var fs = compile(gl.FRAGMENT_SHADER, FRAG_SRC);
+  if (!vs || !fs) {
+    document.body.style.color = '#c66';
+    document.body.style.fontFamily = 'monospace';
+    document.body.style.padding = '2em';
+    document.body.textContent = '着色器编译失败，请查看控制台';
+    return;
+  }
+
+  var prog = gl.createProgram();
+  gl.attachShader(prog, vs);
+  gl.attachShader(prog, fs);
+  gl.linkProgram(prog);
+  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+    console.error('[恒星] 程序链接失败:', gl.getProgramInfoLog(prog));
+    document.body.style.color = '#c66';
+    document.body.style.fontFamily = 'monospace';
+    document.body.style.padding = '2em';
+    document.body.textContent = '着色器程序链接失败，请查看控制台';
+    return;
+  }
+  gl.useProgram(prog);
+  gl.deleteShader(vs);
+  gl.deleteShader(fs);
+
+  var buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+
+  var aPos = gl.getAttribLocation(prog, 'aPos');
+  if (aPos < 0) { console.error('[恒星] 找不到 aPos'); return; }
+  gl.enableVertexAttribArray(aPos);
+  gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+
+  function loc(name, fallback) {
+    var l = gl.getUniformLocation(prog, name);
+    if (l === null && fallback) l = gl.getUniformLocation(prog, fallback);
+    return l;
+  }
+
+  var uRes           = loc('uRes');
+  var uTime          = loc('uTime');
+  var uCamPos        = loc('uCamPos');
+  var uR             = loc('uR');
+  var uFlareDir      = loc('uFlareDir[0]', 'uFlareDir');
+  var uFlareData     = loc('uFlareData[0]', 'uFlareData');
+  var uPromA         = loc('uPromA[0]', 'uPromA');
+  var uPromB         = loc('uPromB[0]', 'uPromB');
+  var uPromData      = loc('uPromData[0]', 'uPromData');
+  var uBaseColor     = loc('uBaseColor');
+  var uChromoColor   = loc('uChromoColor');
+  var uCoronaColor   = loc('uCoronaColor');
+  var uLimb          = loc('uLimb');
+  var uGranContrast  = loc('uGranContrast');
+  var uBrightness    = loc('uBrightness');
+  var uLifeEvolve    = loc('uLifeEvolve');
+  var uFlattening    = loc('uFlattening');
+  var uMagConnect    = loc('uMagConnect');
+
+  var STAR_PRESETS = {
+    blue: {
+      base:         [0.78, 0.90, 1.00],
+      chromo:       [0.50, 0.72, 1.00],
+      corona:       [0.68, 0.84, 1.00],
+      limb:         0.42,
+      granContrast: 0.55,
+      brightness:   0.90
+    },
+    yellow: {
+      base:         [1.00, 0.97, 0.90],
+      chromo:       [1.00, 0.62, 0.35],
+      corona:       [1.00, 0.92, 0.78],
+      limb:         0.45,
+      granContrast: 0.42,
+      brightness:   1.35
+    },
+    red: {
+      base:         [1.00, 0.82, 0.62],
+      chromo:       [1.00, 0.38, 0.16],
+      corona:       [1.00, 0.72, 0.50],
+      limb:         0.55,
+      granContrast: 0.48,
+      brightness:   1.20
+    }
+  };
+
+  var STAR_KEYS = ['blue', 'yellow', 'red'];
+  var chosenKey = STAR_KEYS[Math.floor(Math.random() * STAR_KEYS.length)];
+  var star = STAR_PRESETS[chosenKey] || STAR_PRESETS.yellow;
+
+  var MAX_PIXELS = 2400000;
+
+  function resize() {
+    var dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+    var w = Math.max(1, Math.floor(window.innerWidth * dpr));
+    var h = Math.max(1, Math.floor(window.innerHeight * dpr));
+    var total = w * h;
+    if (total > MAX_PIXELS) {
+      var k = Math.sqrt(MAX_PIXELS / total);
+      w = Math.max(1, Math.floor(w * k));
+      h = Math.max(1, Math.floor(h * k));
+    }
+    if (canvas.width !== w || canvas.height !== h) {
+      canvas.width = w;
+      canvas.height = h;
+      gl.viewport(0, 0, w, h);
+    }
+  }
+
+  var MAX_FLARES = 3;
+  var flares = [];
+  var nextFlareAt = 2.5;
+
+  var dirArr  = new Float32Array(MAX_FLARES * 3);
+  var dataArr = new Float32Array(MAX_FLARES * 4);
+
+  function randomFlareDir() {
+    var cz = 0.10 + Math.random() * 0.90;
+    var sp = Math.sqrt(Math.max(0.0, 1.0 - cz * cz));
+    var ph = Math.random() * Math.PI * 2.0;
+    return [sp * Math.cos(ph), sp * Math.sin(ph), cz];
+  }
+
+  function updateFlares(t) {
+    var alive = [];
+    for (var i = 0; i < flares.length; i++) {
+      if (t - flares[i].start < flares[i].duration) alive.push(flares[i]);
+    }
+    flares = alive;
+
+    if (t >= nextFlareAt) {
+      if (flares.length < MAX_FLARES) {
+        flares.push({
+          dir: randomFlareDir(),
+          start: t,
+          duration: 4.0 + Math.random() * 6.5,
+          intensity: 0.75 + Math.random() * 0.75
+        });
+        nextFlareAt = t + 1.2 + Math.random() * 3.5;
+      } else {
+        nextFlareAt = t + 1.0 + Math.random() * 3.0;
+      }
+    }
+  }
+
+  function packFlareUniforms(t) {
+    dirArr[0] = 0; dirArr[1] = 0; dirArr[2] = 1;
+    dirArr[3] = 0; dirArr[4] = 0; dirArr[5] = 1;
+    dirArr[6] = 0; dirArr[7] = 0; dirArr[8] = 1;
+    for (var k = 0; k < MAX_FLARES * 4; k++) dataArr[k] = 0;
+
+    for (var i = 0; i < flares.length && i < MAX_FLARES; i++) {
+      var f = flares[i];
+      dirArr[i * 3 + 0] = f.dir[0];
+      dirArr[i * 3 + 1] = f.dir[1];
+      dirArr[i * 3 + 2] = f.dir[2];
+      var age = (t - f.start) / f.duration;
+      if (age < 0) age = 0;
+      if (age > 1) age = 1;
+      dataArr[i * 4 + 0] = age;
+      dataArr[i * 4 + 1] = f.intensity;
+    }
+  }
+
+  var MAX_PROM = 2;
+  var prominences = [];
+  var nextPromAt = 5.0;
+
+  var promAArr    = new Float32Array(MAX_PROM * 3);
+  var promBArr    = new Float32Array(MAX_PROM * 3);
+  var promDataArr = new Float32Array(MAX_PROM * 2);
+
+  function randomPromBaseDir() {
+    var cz = (Math.random() - 0.5) * 0.35;
+    var sp = Math.sqrt(Math.max(0.0, 1.0 - cz * cz));
+    var ph = Math.random() * Math.PI * 2.0;
+    return [sp * Math.cos(ph), sp * Math.sin(ph), cz];
+  }
+
+  function rotateToward(base, span) {
+    var tx = Math.random() - 0.5;
+    var ty = Math.random() - 0.5;
+    var tz = Math.random() - 0.5;
+    var d = tx * base[0] + ty * base[1] + tz * base[2];
+    tx -= d * base[0]; ty -= d * base[1]; tz -= d * base[2];
+    var l = Math.sqrt(tx * tx + ty * ty + tz * tz);
+    if (l < 1e-4) return rotateToward(base, span);
+    tx /= l; ty /= l; tz /= l;
+
+    var c = Math.cos(span), s = Math.sin(span);
+    var cx = ty * base[2] - tz * base[1];
+    var cy = tz * base[0] - tx * base[2];
+    var cz2 = tx * base[1] - ty * base[0];
+
+    return [
+      base[0] * c + cx * s,
+      base[1] * c + cy * s,
+      base[2] * c + cz2 * s
+    ];
+  }
+
+  function updateProminences(t) {
+    var alive = [];
+    for (var i = 0; i < prominences.length; i++) {
+      if (t - prominences[i].start < prominences[i].duration) alive.push(prominences[i]);
+    }
+    prominences = alive;
+
+    if (t >= nextPromAt) {
+      if (prominences.length < MAX_PROM) {
+        var a = randomPromBaseDir();
+        var span = 0.55 + Math.random() * 0.55;
+        var b = rotateToward(a, span);
+        prominences.push({
+          a: a,
+          b: b,
+          start: t,
+          duration: 8.0 + Math.random() * 8.0,
+          strength: 0.75 + Math.random() * 0.45
+        });
+        nextPromAt = t + 4.0 + Math.random() * 6.0;
+      } else {
+        nextPromAt = t + 2.5 + Math.random() * 2.0;
+      }
+    }
+  }
+
+  function promEnv(age) {
+    if (age < 0) return 0;
+    if (age > 1) return 0;
+    var rise = Math.min(1, age / 0.15);
+    var fall = age < 0.75 ? 1 : (1 - (age - 0.75) / 0.25);
+    return rise * fall;
+  }
+
+  function packProminenceUniforms(t) {
+    for (var k = 0; k < MAX_PROM * 3; k++) { promAArr[k] = 0; promBArr[k] = 0; }
+    for (var k2 = 0; k2 < MAX_PROM * 2; k2++) promDataArr[k2] = 0;
+
+    for (var i = 0; i < prominences.length && i < MAX_PROM; i++) {
+      var pr = prominences[i];
+      promAArr[i * 3 + 0] = pr.a[0];
+      promAArr[i * 3 + 1] = pr.a[1];
+      promAArr[i * 3 + 2] = pr.a[2];
+      promBArr[i * 3 + 0] = pr.b[0];
+      promBArr[i * 3 + 1] = pr.b[1];
+      promBArr[i * 3 + 2] = pr.b[2];
+      var age = (t - pr.start) / pr.duration;
+      promDataArr[i * 2 + 0] = pr.strength * promEnv(age);
+    }
+  }
+
+  var startTime = performance.now();
+  var camPos = [0.0, 0.0, 7.0];
+  var rafId = 0;
+  var paused = false;
+  var lastElapsed = 0;
+
+  /* P 模式：60 秒周期，振幅 0.26% */
+  var PMODE_PERIOD = 60.0;
+  var PMODE_AMP    = 0.0026;
+
+  function frame(now) {
+    if (paused) return;
+    lastElapsed = now - startTime;
+    var t = lastElapsed / 1000;
+
+    resize();
+    updateFlares(t);
+    packFlareUniforms(t);
+    updateProminences(t);
+    packProminenceUniforms(t);
+
+    /* 脉动半径 */
+    var rPulse = 1.0;
+    if (ENABLE_PMODE) {
+      rPulse = 1.0 + PMODE_AMP * Math.sin(t * 2.0 * Math.PI / PMODE_PERIOD);
+    }
+
+    gl.useProgram(prog);
+    gl.uniform2f(uRes, canvas.width, canvas.height);
+    gl.uniform1f(uTime, t);
+    gl.uniform3f(uCamPos, camPos[0], camPos[1], camPos[2]);
+    gl.uniform1f(uR, rPulse);
+    gl.uniform3fv(uFlareDir, dirArr);
+    gl.uniform4fv(uFlareData, dataArr);
+    gl.uniform3fv(uPromA, promAArr);
+    gl.uniform3fv(uPromB, promBArr);
+    gl.uniform2fv(uPromData, promDataArr);
+    gl.uniform3fv(uBaseColor, star.base);
+    gl.uniform3fv(uChromoColor, star.chromo);
+    gl.uniform3fv(uCoronaColor, star.corona);
+    gl.uniform1f(uLimb, star.limb);
+    gl.uniform1f(uGranContrast, star.granContrast);
+    gl.uniform1f(uBrightness, star.brightness);
+    gl.uniform1f(uLifeEvolve, ENABLE_LIFE_EVOLVE ? 1.0 : 0.0);
+    gl.uniform1f(uFlattening, ENABLE_FLATTENING ? 0.000009 : 0.0);
+    gl.uniform1f(uMagConnect, ENABLE_MAG_CONNECT ? 1.0 : 0.0);
+
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    rafId = requestAnimationFrame(frame);
+  }
+
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) {
+      paused = true;
+      if (rafId) { cancelAnimationFrame(rafId); rafId = 0; }
+    } else if (paused) {
+      paused = false;
+      startTime = performance.now() - lastElapsed;
+      rafId = requestAnimationFrame(frame);
+    }
+  });
+
+  resize();
+  rafId = requestAnimationFrame(frame);
+
+})();
+</script>
+</body>
+</html>

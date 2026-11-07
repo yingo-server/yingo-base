@@ -1,0 +1,194 @@
+<!--
+  相对路径: ./index.html
+  说明: 引导序列：字幕淡出 → 曝光爬升 → 等首帧就绪 → 退曝光。
+        曝光退场由 render.first.ready 驱动，超时 4s 强制退出。
+-->
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>三体 · 3D 天体模拟</title>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<style>
+  :root { --fg: #c8d0d8; --dim: #4a5560; --faint: #1a1f24; --accent: #6b8fa8; }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; width: 100%; height: 100%;
+    overflow: hidden; background: #000; color: var(--fg);
+    font-family: ui-monospace, 'JetBrains Mono', 'Space Mono', monospace;
+    overscroll-behavior: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #stage {
+    position: fixed; inset: 0; display: block;
+    width: 100%; height: 100%;
+    touch-action: none;
+    -webkit-user-select: none; user-select: none;
+    cursor: grab;
+  }
+  #stage:active { cursor: grabbing; }
+  #boot-min {
+    position: fixed; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--dim); font-size: 10px; letter-spacing: .4em;
+    text-transform: uppercase; pointer-events: none;
+    transition: opacity .5s ease;
+    z-index: 9998;
+  }
+  #boot-min.hidden { opacity: 0; }
+  #boot-flash {
+    position: fixed; inset: 0;
+    background: #fff; opacity: 0;
+    pointer-events: none; z-index: 9999;
+    will-change: opacity;
+  }
+  #err-badge {
+    position: fixed; left: 12px; bottom: 12px;
+    padding: 6px 10px;
+    background: rgba(180, 40, 40, 0.85);
+    color: #fff; font-size: 10px; letter-spacing: .1em;
+    border-radius: 3px; pointer-events: none;
+    z-index: 10000; opacity: 0; transition: opacity .3s ease;
+  }
+  #err-badge.show { opacity: 1; }
+</style>
+</head>
+
+<body>
+  <canvas id="stage"></canvas>
+  <div id="boot-min">INITIALIZING</div>
+  <div id="boot-flash"></div>
+  <div id="err-badge"></div>
+
+  <script>
+    ['gesturestart','gesturechange','gestureend'].forEach(evt => {
+      document.addEventListener(evt, e => e.preventDefault(), { passive: false });
+    });
+    document.addEventListener('dblclick', e => e.preventDefault(), { passive: false });
+    document.addEventListener('touchmove', e => {
+      if (e.touches.length > 1) e.preventDefault();
+    }, { passive: false });
+
+    window.__reportBadge = function(text) {
+      const el = document.getElementById('err-badge');
+      if (!el) return;
+      el.textContent = text;
+      el.classList.add('show');
+      clearTimeout(el._t);
+      el._t = setTimeout(() => el.classList.remove('show'), 4000);
+    };
+  </script>
+
+  <script type="module">
+    import { SimulationBus } from './src/bus.js';
+    import { reportError }    from './src/errors.js';
+
+    const overlay = document.getElementById('boot-min');
+    const flash   = document.getElementById('boot-flash');
+    const badge   = window.__reportBadge;
+
+    const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+    window.addEventListener('error', (e) => {
+      if (badge) badge('UNCAUGHT: ' + (e.message || 'error'));
+    });
+    window.addEventListener('unhandledrejection', (e) => {
+      if (badge) badge('REJECTION: ' + (e.reason?.message || 'unknown'));
+    });
+
+    let bus;
+    try {
+      bus = new SimulationBus();
+      window.__bus = bus;
+    } catch (err) {
+      reportError('00010', err, { phase: 'bus.construction' });
+      if (badge) badge('BUS FAILED');
+      throw err;
+    }
+
+    const BUNDLES = [
+      './src/physics.js',
+      './src/ui.js',
+      './src/cache.js',
+      './src/api.js',
+    ];
+
+    (async () => {
+      const loadTasks = BUNDLES.map(path =>
+        bus.loadModule(path).catch(() => null)
+      );
+      await Promise.allSettled(loadTasks);
+
+      const renderReady = new Promise(resolve => {
+        bus.once('render.first.ready', () => resolve(true));
+      });
+
+      try { await bus.boot(); }
+      catch (err) {
+        reportError('00012', err, { phase: 'bus.boot' });
+        if (badge) badge('BOOT FAILED');
+      }
+
+      // ★ LIVELY BRIDGE
+      try {
+        const { installLivelyBridge } = await import('./src/lively-bridge.js');
+        installLivelyBridge(bus);
+      } catch (err) {
+        reportError('00070', err, { phase: 'lively-bridge.load' });
+      }
+
+      let last = performance.now();
+      let tickErrors = 0;
+      function frame(now) {
+        try {
+          const dt = Math.min((now - last) / 1000, 0.1);
+          last = now;
+          bus.tick(dt);
+          tickErrors = 0;
+        } catch (err) {
+          tickErrors++;
+          if (tickErrors <= 3) reportError('00003', err, { phase: 'frame' });
+          if (tickErrors === 3 && badge) badge('RENDER ERROR');
+        }
+        requestAnimationFrame(frame);
+      }
+      requestAnimationFrame(frame);
+
+      setTimeout(() => { overlay.classList.add('hidden'); }, 30);
+
+      setTimeout(() => {
+        flash.style.transition = 'opacity 0.8s ease-in';
+        flash.style.opacity = '1';
+      }, 650);
+
+      await Promise.race([renderReady, sleep(4000)]);
+
+      await sleep(200);
+
+      flash.style.transition = 'opacity 1.1s ease-out';
+      flash.style.opacity = '0';
+
+      setTimeout(() => {
+        try {
+          const h = bus.health();
+          const failed = h.failed || [];
+          if (failed.length > 0 && badge) {
+            badge('DEGRADED: ' + failed.join(', '));
+          }
+        } catch (_) {}
+      }, 3000);
+    })();
+  </script>
+</body>
+</html>

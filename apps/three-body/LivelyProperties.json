@@ -1,0 +1,236 @@
+{
+  "displayQuality": {
+    "type": "dropdown",
+    "text": "显示质量 / Display Quality",
+    "value": "high",
+    "items": ["potato", "low", "medium", "high", "ultra", "super ultra"]
+  },
+  "timeScale": {
+    "type": "slider",
+    "text": "时间流速 / Time Scale",
+    "value": 12,
+    "min": 1,
+    "max": 20,
+    "tick": 19,
+    "step": 1
+  },
+  "escapeFrameLimit": {
+    "type": "slider",
+    "text": "逃逸判定帧数 / Escape Frames",
+    "value": 90,
+    "min": 30,
+    "max": 300,
+    "tick": 270,
+    "step": 10
+  },
+  "autoReset": {
+    "type": "checkbox",
+    "text": "自动重置 / Auto Reset",
+    "value": true
+  },
+  "trajectoryLength": {
+    "type": "slider",
+    "text": "轨迹长度 / Trajectory Length",
+    "value": 512,
+    "min": 256,
+    "max": 2048,
+    "tick": 1792,
+    "step": 256
+  },
+  "cameraFov": {
+    "type": "slider",
+    "text": "相机视野 / Camera FOV",
+    "value": 38,
+    "min": 20,
+    "max": 60,
+    "tick": 40,
+    "step": 1
+  },
+  "cameraZoomSpeed": {
+    "type": "slider",
+    "text": "缩放速度 / Zoom Speed",
+    "value": 2.8,
+    "min": 0.5,
+    "max": 6.0,
+    "tick": 55,
+    "step": 0.1
+  },
+  "cameraMinDistance": {
+    "type": "slider",
+    "text": "最近距离 / Min Distance",
+    "value": 3,
+    "min": 1,
+    "max": 20,
+    "tick": 19,
+    "step": 1
+  },
+  "cameraMaxDistance": {
+    "type": "slider",
+    "text": "最远距离 / Max Distance",
+    "value": 250,
+    "min": 50,
+    "max": 500,
+    "tick": 450,
+    "step": 10
+  },
+  "cameraSmoothPos": {
+    "type": "slider",
+    "text": "相机平滑 / Camera Smooth",
+    "value": 0.08,
+    "min": 0.01,
+    "max": 0.30,
+    "tick": 29,
+    "step": 0.01
+  },
+  "starCount": {
+    "type": "slider",
+    "text": "背景星数 / Star Count",
+    "value": 2000,
+    "min": 500,
+    "max": 5000,
+    "tick": 4500,
+    "step": 100
+  },
+  "sunRadius": {
+    "type": "slider",
+    "text": "太阳半径 / Sun Radius",
+    "value": 0.7,
+    "min": 0.3,
+    "max": 1.5,
+    "tick": 120,
+    "step": 0.05
+  },
+  "bloomStrength": {
+    "type": "slider",
+    "text": "泛光强度 / Bloom Strength",
+    "value": 1.0,
+    "min": 0.0,
+    "max": 2.0,
+    "tick": 200,
+    "step": 0.05
+  },
+  "bloomRadius": {
+    "type": "slider",
+    "text": "泛光半径 / Bloom Radius",
+    "value": 0.6,
+    "min": 0.0,
+    "max": 1.5,
+    "tick": 150,
+    "step": 0.05
+  },
+  "bloomThreshold": {
+    "type": "slider",
+    "text": "泛光阈值 / Bloom Threshold",
+    "value": 0.9,
+    "min": 0.0,
+    "max": 1.0,
+    "tick": 100,
+    "step": 0.02
+  },
+
+  "dev.gravityExponent": {
+    "type": "slider",
+    "text": "[DEV] 引力指数 / Gravity Exponent",
+    "value": 3,
+    "min": 2,
+    "max": 5,
+    "tick": 6,
+    "step": 0.5
+  },
+  "dev.softening": {
+    "type": "slider",
+    "text": "[DEV] 软化距离 / Softening",
+    "value": 3.4,
+    "min": 1.0,
+    "max": 8.0,
+    "tick": 70,
+    "step": 0.1
+  },
+  "dev.softeningExt": {
+    "type": "slider",
+    "text": "[DEV] 软化扩展 / Softening Ext",
+    "value": 3.5,
+    "min": 1.0,
+    "max": 8.0,
+    "tick": 70,
+    "step": 0.1
+  },
+  "dev.cageRadius": {
+    "type": "slider",
+    "text": "[DEV] 约束生效距离 / Cage Radius",
+    "value": 32,
+    "min": 15,
+    "max": 80,
+    "tick": 65,
+    "step": 1
+  },
+  "dev.cageExponent": {
+    "type": "slider",
+    "text": "[DEV] 约束指数 / Cage Exponent",
+    "value": 2,
+    "min": 1,
+    "max": 5,
+    "tick": 8,
+    "step": 0.5
+  },
+  "dev.repulsionRadius": {
+    "type": "slider",
+    "text": "[DEV] 斥力半径 / Repulsion Radius",
+    "value": 3.0,
+    "min": 1.0,
+    "max": 8.0,
+    "tick": 70,
+    "step": 0.1
+  },
+  "dev.safetyFactor": {
+    "type": "slider",
+    "text": "[DEV] 积分精度 / Safety Factor",
+    "value": 0.028,
+    "min": 0.005,
+    "max": 0.08,
+    "tick": 75,
+    "step": 0.001
+  },
+  "dev.maxSubsteps": {
+    "type": "slider",
+    "text": "[DEV] 最大子步数 / Max Substeps",
+    "value": 64,
+    "min": 16,
+    "max": 256,
+    "tick": 240,
+    "step": 16
+  },
+  "dev.escapeDist": {
+    "type": "slider",
+    "text": "[DEV] 逃逸距离 / Escape Distance",
+    "value": 67.5,
+    "min": 30,
+    "max": 200,
+    "tick": 170,
+    "step": 5
+  },
+  "dev.lodStartLevel": {
+    "type": "dropdown",
+    "text": "[DEV] LOD 起始等级 / LOD Start Level",
+    "value": "medium",
+    "items": ["potato", "low", "medium", "high", "ultra", "super ultra"]
+  },
+  "dev.lodRiseMs": {
+    "type": "slider",
+    "text": "[DEV] LOD 提升间隔 / LOD Rise (ms)",
+    "value": 700,
+    "min": 100,
+    "max": 3000,
+    "tick": 2900,
+    "step": 100
+  },
+  "dev.pixelRatio": {
+    "type": "slider",
+    "text": "[DEV] 渲染像素比 / Pixel Ratio",
+    "value": 2.0,
+    "min": 0.5,
+    "max": 3.0,
+    "tick": 25,
+    "step": 0.1
+  }
+}
