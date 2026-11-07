@@ -1,0 +1,17 @@
+.board-container { display: flex; flex-direction: column; align-items: center; width: 100%; }
+.board-canvas {
+    display: block; width: 100%; max-width: 600px; aspect-ratio: 1 / 1;
+    border-radius: var(--md-radius-large); background-color: #ecd5b0;
+    box-shadow: var(--md-shadow-2), inset 0 0 0 2px #b5875a;
+    cursor: pointer; transition: box-shadow 0.2s;
+}
+.board-canvas:active { box-shadow: var(--md-shadow-1), inset 0 0 0 2px #b5875a; }
+.turn-indicator {
+    display: flex; align-items: center; gap: 8px; margin-top: 16px;
+    padding: 8px 24px; background-color: var(--md-surface);
+    border-radius: 32px; box-shadow: var(--md-shadow-1);
+    font-size: 1.25rem; font-weight: 500;
+}
+.turn-indicator .material-icons { font-size: 28px; color: #000; }
+.turn-indicator.white-turn .material-icons { color: #fff; text-shadow: 0 0 2px #000; }
+.board-actions { margin-top: 12px; display: flex; justify-content: center; }
