@@ -1,0 +1,7 @@
+{
+  "id": "chess",
+  "name": "国际象棋",
+  "icon": "lawnicons:generic_grid_3x3",
+  "type": "grid",
+  "entry": "apps/chess/index.html"
+}
